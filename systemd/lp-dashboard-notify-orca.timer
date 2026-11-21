@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Orca notifier hourly at minute 4
+
+[Timer]
+OnCalendar=*-*-* *:04:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-orca.service
+
+[Install]
+WantedBy=timers.target

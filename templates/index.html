@@ -1,0 +1,378 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-6xl mx-auto">
+    <h1 class="mb-8 text-3xl font-bold">
+        <a href="{{ request.url_for('read_root') }}"
+           class="inline-flex items-center gap-2 text-emerald-400 hover:text-emerald-300 focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-emerald-400">
+            <span aria-hidden="true">📈</span>
+            <span>LP Yield Dashboard</span>
+        </a>
+    </h1>
+
+    {% if filter_error %}
+    <p class="mb-4 rounded bg-red-900/50 p-4 text-red-200" role="alert">{{ filter_error }}</p>
+    {% endif %}
+
+    <form id="dashboard-filters" method="post"
+          action="{{ request.url_for('update_dashboard') }}"
+          hx-post="{{ request.url_for('update_dashboard') }}"
+          hx-target="#table-container" 
+          hx-trigger="change, submit, load"
+          hx-on::response-error="document.getElementById('table-container').innerHTML = event.detail.xhr.responseText"
+          class="mb-8 space-y-4">
+        <div class="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section class="flex flex-col rounded-xl bg-gray-800 p-6 shadow-lg" aria-labelledby="filters-heading">
+                <h2 id="filters-heading" class="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-300">Filter</h2>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div>
+                        <label class="mb-2 block text-xs uppercase tracking-wider text-gray-400">Blockchain</label>
+                        <select name="blockchain" class="w-full rounded border border-gray-600 bg-gray-700 p-2 text-white">
+                            <option value="all">Alle Blockchains</option>
+                            {% for bc in blockchains %}
+                            <option value="{{ bc }}">{{ bc }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="mb-2 block text-xs uppercase tracking-wider text-gray-400">Token</label>
+                        <select name="token" class="w-full rounded border border-gray-600 bg-gray-700 p-2 text-white">
+                            <option value="all">Alle Tokens</option>
+                            {% for t in tokens %}
+                            <option value="{{ t }}">{{ t }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="position-id" class="mb-2 block text-xs uppercase tracking-wider text-gray-400">Position ID</label>
+                        <select id="position-id" name="position_id" class="w-full rounded border border-gray-600 bg-gray-700 p-2 text-white">
+                            <option value="">Alle Positionen</option>
+                            <option value="__open_positions__">Offene Positionen</option>
+                            {% for position_id in position_ids %}
+                            <option value="{{ position_id }}">{{ position_id }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="view" class="mb-2 block text-xs uppercase tracking-wider text-gray-400">Ansicht</label>
+                        <select id="view" name="view" class="w-full rounded border border-gray-600 bg-gray-700 p-2 text-white">
+                            <option value="positions">Je Position</option>
+                            <option value="token_totals">Summen je Token-Symbol</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="mb-2 block text-xs uppercase tracking-wider text-gray-400">Gruppierung</label>
+                        <select name="period" class="w-full rounded border border-gray-600 bg-gray-700 p-2 text-white">
+                            <option value="D">Täglich</option>
+                            <option value="W">Wöchentlich</option>
+                            <option value="M">Monatlich</option>
+                            <option value="Y">Jährlich</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-400">Alle verfügbaren Daten</p>
+                    </div>
+
+                    <div>
+                        <label class="mb-2 block text-xs uppercase tracking-wider text-gray-400">Währung</label>
+                        <select name="currency" class="w-full rounded border border-gray-600 bg-gray-700 p-2 text-white">
+                            <option value="USD">USD ($)</option>
+                            <option value="EUR">EUR (€)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-auto flex flex-col justify-center gap-3 pt-6 sm:flex-row">
+                    <button type="submit"
+                            class="rounded bg-emerald-600 px-6 py-3 font-semibold text-white transition hover:bg-emerald-500">
+                        Aktualisieren
+                    </button>
+                    <button type="button"
+                            onclick="this.form.reset(); htmx.trigger(this.form, 'submit')"
+                            class="rounded bg-gray-600 px-6 py-3 font-semibold text-white transition hover:bg-gray-500">
+                        Filter zurücksetzen
+                    </button>
+                </div>
+            </section>
+
+            <section class="rounded-xl bg-gray-800 p-6 shadow-lg" aria-labelledby="date-range-heading">
+                <h2 id="date-range-heading" class="mb-4 text-sm font-semibold uppercase tracking-wider text-gray-300">Datumsbereich</h2>
+                <div class="grid grid-cols-1 gap-4">
+                    <div>
+                        <label for="start-date" class="mb-2 block text-xs uppercase tracking-wider text-gray-400">Von</label>
+                        <input id="start-date" name="start_date" type="date"
+                               class="w-full rounded border border-gray-600 bg-gray-700 p-2 text-white"
+                               aria-label="Startdatum der Erträge">
+                    </div>
+
+                    <div>
+                        <label for="end-date" class="mb-2 block text-xs uppercase tracking-wider text-gray-400">Bis</label>
+                        <input id="end-date" name="end_date" type="date"
+                               class="w-full rounded border border-gray-600 bg-gray-700 p-2 text-white"
+                               aria-label="Enddatum der Erträge">
+                    </div>
+                </div>
+            </section>
+        </div>
+
+    </form>
+
+    <div id="table-container" class="bg-gray-800 rounded-xl p-6 shadow-lg">
+        <p id="dashboard-loading" class="text-center text-gray-400">Lade Ertragsdaten...</p>
+    </div>
+</div>
+<script>
+    window.invertPositionPrice = (toggle) => {
+        const range = toggle.closest("[data-price-range]");
+        if (!range) {
+            return;
+        }
+
+        const lower = Number(range.dataset.lower);
+        const upper = Number(range.dataset.upper);
+        const current = Number(range.dataset.price);
+        if (![lower, upper, current].every((value) => Number.isFinite(value) && value > 0)) {
+            return;
+        }
+
+        const inverted = toggle.checked;
+        const shownLower = inverted ? 1 / upper : lower;
+        const shownUpper = inverted ? 1 / lower : upper;
+        const shownCurrent = inverted ? 1 / current : current;
+        const marker = shownUpper === shownLower
+            ? 50
+            : Math.max(
+                0,
+                Math.min(100, ((shownCurrent - shownLower) / (shownUpper - shownLower)) * 100),
+            );
+        const formatter = new Intl.NumberFormat("de-DE", {
+            maximumSignificantDigits: 8,
+        });
+        range.querySelector("[data-range-min]").textContent =
+            formatter.format(shownLower);
+        range.querySelector("[data-range-max]").textContent =
+            formatter.format(shownUpper);
+        range.querySelector("[data-range-current]").textContent =
+            formatter.format(shownCurrent);
+        range.querySelector("[data-range-marker]").style.left = `${marker}%`;
+        const pair = range.querySelector("[data-price-pair]");
+        pair.textContent = inverted
+            ? `${pair.dataset.baseSymbol} pro ${pair.dataset.quoteSymbol}`
+            : `${pair.dataset.quoteSymbol} pro ${pair.dataset.baseSymbol}`;
+        range.dataset.inverted = String(inverted);
+    };
+
+    (() => {
+        const tableContainer = document.getElementById("table-container");
+        let currentPage = 1;
+        const textCollator = new Intl.Collator("de", { numeric: true });
+        const numberFormatter = new Intl.NumberFormat("de-DE", {
+            maximumFractionDigits: 0,
+        });
+
+        const renderPage = () => {
+            const pageSizeSelect = tableContainer.querySelector("#table-page-size");
+            if (!pageSizeSelect) {
+                return;
+            }
+
+            const rows = [...tableContainer.querySelectorAll("[data-dashboard-row]")];
+            const pageSize = pageSizeSelect.value === "all"
+                ? Math.max(rows.length, 1)
+                : Number(pageSizeSelect.value);
+            const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+            currentPage = Math.min(currentPage, pageCount);
+
+            const firstRow = (currentPage - 1) * pageSize;
+            const lastRow = Math.min(firstRow + pageSize, rows.length);
+            rows.forEach((row, index) => {
+                row.hidden = index < firstRow || index >= lastRow;
+            });
+
+            tableContainer.querySelector("#table-page-summary").textContent = rows.length
+                ? `${numberFormatter.format(firstRow + 1)}–${numberFormatter.format(lastRow)} von ${numberFormatter.format(rows.length)}`
+                : `${numberFormatter.format(0)} Einträge`;
+            tableContainer.querySelector("#table-page-indicator").textContent =
+                `${numberFormatter.format(currentPage)} / ${numberFormatter.format(pageCount)}`;
+            tableContainer.querySelector('[data-page-action="previous"]').disabled =
+                currentPage <= 1;
+            tableContainer.querySelector('[data-page-action="next"]').disabled =
+                currentPage >= pageCount;
+        };
+
+        document.addEventListener("change", (event) => {
+            if (event.target.id === "table-page-size") {
+                currentPage = 1;
+                renderPage();
+                return;
+            }
+
+        });
+
+        document.body.addEventListener("htmx:responseError", (event) => {
+            const requestElement = event.detail.elt;
+            if (!requestElement) {
+                return;
+            }
+            const detailsElement = requestElement.closest("details[hx-get]");
+            const detailsContent = detailsElement?.querySelector(
+                "[data-position-details], [data-performance-summary]",
+            );
+            if (detailsContent) {
+                detailsContent.innerHTML = event.detail.xhr.responseText;
+            }
+        });
+
+        tableContainer.addEventListener("click", (event) => {
+            const sortButton = event.target.closest("[data-sort-column]");
+            if (sortButton) {
+                const table = sortButton.closest("table");
+                const columnIndex = Number(sortButton.dataset.sortColumn);
+                const header = sortButton.closest("th");
+                const direction = header.getAttribute("aria-sort") === "descending"
+                    ? "ascending"
+                    : "descending";
+                const rows = [...table.querySelectorAll("tbody [data-dashboard-row]")];
+                const sortType = sortButton.dataset.sortType;
+
+                rows.sort((left, right) => {
+                    const leftCell = left.cells[columnIndex];
+                    const rightCell = right.cells[columnIndex];
+                    const leftValue = leftCell.dataset.sortValue ?? "";
+                    const rightValue = rightCell.dataset.sortValue ?? "";
+                    if (leftValue === "" || rightValue === "") {
+                        return leftValue === rightValue ? 0 : leftValue === "" ? 1 : -1;
+                    }
+
+                    let comparison = sortType === "number"
+                        ? Number(leftValue) - Number(rightValue)
+                        : textCollator.compare(leftValue, rightValue);
+                    if (comparison === 0 && columnIndex === 3) {
+                        comparison = textCollator.compare(
+                            leftCell.dataset.sortSecondary ?? "",
+                            rightCell.dataset.sortSecondary ?? "",
+                        );
+                    }
+                    return direction === "descending" ? -comparison : comparison;
+                });
+                rows.forEach((row) => table.tBodies[0].append(row));
+                table.querySelectorAll("[data-sort-column]").forEach((button) => {
+                    const columnHeader = button.closest("th");
+                    if (button === sortButton) {
+                        columnHeader.setAttribute(
+                            "aria-sort",
+                            direction === "descending" ? "descending" : "ascending",
+                        );
+                        button.lastElementChild.textContent =
+                            direction === "descending" ? "↓" : "↑";
+                    } else {
+                        columnHeader.setAttribute("aria-sort", "none");
+                        button.lastElementChild.textContent = "↕";
+                    }
+                });
+                currentPage = 1;
+                renderPage();
+                return;
+            }
+
+            const button = event.target.closest("[data-page-action]");
+            if (!button || button.disabled) {
+                return;
+            }
+            currentPage += button.dataset.pageAction === "next" ? 1 : -1;
+            renderPage();
+        });
+
+        document.addEventListener("htmx:afterSwap", (event) => {
+            if (event.detail.target === tableContainer) {
+                currentPage = 1;
+                renderPage();
+            }
+        });
+    })();
+
+    (() => {
+        const filterPerformanceRows = (table) => {
+            const activeOnly = table.parentElement.querySelector(
+                "[data-performance-active-filter]",
+            ).checked;
+            const protocol = table.parentElement.querySelector(
+                "[data-performance-protocol-filter]",
+            ).value;
+            const blockchain = table.parentElement.querySelector(
+                "[data-performance-blockchain-filter]",
+            ).value;
+            table.querySelectorAll("[data-performance-row]").forEach((row) => {
+                row.hidden =
+                    (activeOnly && row.dataset.active !== "true") ||
+                    (protocol !== "" && row.dataset.protocol !== protocol) ||
+                    (blockchain !== "" && row.dataset.chain !== blockchain);
+            });
+        };
+
+        document.addEventListener("change", (event) => {
+            if (!event.target.matches(
+                "[data-performance-active-filter], " +
+                "[data-performance-protocol-filter], " +
+                "[data-performance-blockchain-filter]",
+            )) {
+                return;
+            }
+            const table = event.target.closest("[data-performance-summary]")
+                ?.querySelector("[data-performance-table]");
+            if (table) {
+                filterPerformanceRows(table);
+            }
+        });
+
+        document.addEventListener("click", (event) => {
+            const sortButton = event.target.closest("[data-performance-sort-column]");
+            if (!sortButton) {
+                return;
+            }
+
+            const table = sortButton.closest("[data-performance-table]");
+            const columnIndex = Number(sortButton.dataset.performanceSortColumn);
+            const header = sortButton.closest("th");
+            const direction = header.getAttribute("aria-sort") === "descending"
+                ? "ascending"
+                : "descending";
+            const rows = [...table.querySelectorAll("tbody [data-performance-row]")];
+            rows.sort((left, right) => {
+                const leftValue = left.cells[columnIndex].dataset.sortValue ?? "";
+                const rightValue = right.cells[columnIndex].dataset.sortValue ?? "";
+                if (leftValue === "" || rightValue === "") {
+                    return leftValue === rightValue ? 0 : leftValue === "" ? 1 : -1;
+                }
+                const comparison = Number(leftValue) - Number(rightValue);
+                return direction === "descending" ? -comparison : comparison;
+            });
+            rows.forEach((row) => table.tBodies[0].append(row));
+            table.querySelectorAll("[data-performance-sort-column]").forEach((button) => {
+                const columnHeader = button.closest("th");
+                if (button === sortButton) {
+                    columnHeader.setAttribute(
+                        "aria-sort",
+                        direction === "descending" ? "descending" : "ascending",
+                    );
+                    button.lastElementChild.textContent =
+                        direction === "descending" ? "↓" : "↑";
+                } else {
+                    columnHeader.setAttribute("aria-sort", "none");
+                    button.lastElementChild.textContent = "↕";
+                }
+            });
+        });
+
+        document.addEventListener("htmx:afterSwap", (event) => {
+            const target = event.detail.target;
+            if (target.matches("[data-performance-summary]")) {
+                const table = target.querySelector("[data-performance-table]");
+                if (table) {
+                    filterPerformanceRows(table);
+                }
+            }
+        });
+    })();
+</script>
+{% endblock %}

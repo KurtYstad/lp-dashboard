@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Uniswap Robinhood notifier hourly at minute 7
+
+[Timer]
+OnCalendar=*-*-* *:07:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-uniswap-robinhood.service
+
+[Install]
+WantedBy=timers.target

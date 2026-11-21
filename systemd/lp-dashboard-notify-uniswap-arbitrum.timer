@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Uniswap Arbitrum notifier hourly at minute 0
+
+[Timer]
+OnCalendar=*-*-* *:00:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-uniswap-arbitrum.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Uniswap daily total notifier at midnight
+
+[Timer]
+OnCalendar=*-*-* 00:00:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-uniswap-total-daily.service
+
+[Install]
+WantedBy=timers.target

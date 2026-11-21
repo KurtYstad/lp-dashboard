@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LP Yield Dashboard</title>
+    <link rel="icon" type="image/svg+xml" href="{{ request.url_for('icons', path='favicon.svg') }}">
+    <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4" defer></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        document.addEventListener("htmx:afterSwap", (event) => {
+            const target = event.detail.target;
+            const positionDataElement = target.querySelector("#position-chart-data");
+            if (positionDataElement) {
+                if (typeof Chart === "undefined") {
+                    console.error("Chart.js is unavailable; the position charts cannot be rendered.");
+                } else {
+                    const positionData = JSON.parse(positionDataElement.textContent);
+                    const priceCanvas = target.querySelector("#position-price-chart");
+                    if (priceCanvas) {
+                        const { labels, values, lower, upper } = positionData.prices;
+                        const priceFormatter = new Intl.NumberFormat("de-DE", {
+                            maximumSignificantDigits: 8,
+                        });
+                        new Chart(priceCanvas, {
+                            type: "line",
+                            data: {
+                                labels,
+                                datasets: [
+                                    {
+                                        label: "Kurs",
+                                        data: values,
+                                        borderWidth: 2,
+                                        pointRadius: 1,
+                                        segment: {
+                                            borderColor: (context) => {
+                                                const midpoint =
+                                                    (context.p0.parsed.y + context.p1.parsed.y) / 2;
+                                                return midpoint >= lower && midpoint <= upper
+                                                    ? "#34d399"
+                                                    : "#f87171";
+                                            },
+                                        },
+                                    },
+                                    {
+                                        label: "Unteres Limit",
+                                        data: labels.map(() => lower),
+                                        borderColor: "#9ca3af",
+                                        borderDash: [5, 5],
+                                        borderWidth: 1,
+                                        pointRadius: 0,
+                                    },
+                                    {
+                                        label: "Oberes Limit",
+                                        data: labels.map(() => upper),
+                                        borderColor: "#9ca3af",
+                                        borderDash: [5, 5],
+                                        borderWidth: 1,
+                                        pointRadius: 0,
+                                    },
+                                ],
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                interaction: { mode: "index", intersect: false },
+                                plugins: {
+                                    legend: { display: false },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (context) =>
+                                                `${context.dataset.label}: ${priceFormatter.format(context.raw)}`,
+                                        },
+                                    },
+                                },
+                                scales: {
+                                    x: {
+                                        ticks: { color: "#9ca3af", maxTicksLimit: 12 },
+                                        grid: { color: "rgba(107, 114, 128, 0.2)" },
+                                    },
+                                    y: {
+                                        ticks: {
+                                            color: "#9ca3af",
+                                            callback: (value) => priceFormatter.format(value),
+                                        },
+                                        grid: { color: "rgba(107, 114, 128, 0.2)" },
+                                    },
+                                },
+                            },
+                        });
+                    }
+                    const earningsCanvas = target.querySelector("#position-earnings-chart");
+                    if (earningsCanvas) {
+                        const usdFormatter = new Intl.NumberFormat("de-DE", {
+                            style: "currency",
+                            currency: "USD",
+                        });
+                        const colors = [
+                            "#38bdf8", "#fbbf24", "#a78bfa", "#fb7185",
+                            "#34d399", "#f97316", "#c084fc",
+                        ];
+                        new Chart(earningsCanvas, {
+                            type: "bar",
+                            data: {
+                                labels: positionData.earnings.labels,
+                                datasets: positionData.earnings.datasets.map((dataset, index) => ({
+                                    ...dataset,
+                                    backgroundColor: colors[index % colors.length],
+                                })),
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                interaction: { mode: "index", intersect: false },
+                                plugins: {
+                                    legend: {
+                                        position: "bottom",
+                                        labels: { color: "#d1d5db" },
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: (context) =>
+                                                `${context.dataset.label}: ${usdFormatter.format(context.raw)}`,
+                                        },
+                                    },
+                                },
+                                scales: {
+                                    x: {
+                                        ticks: { color: "#9ca3af", maxTicksLimit: 12 },
+                                        grid: { color: "rgba(107, 114, 128, 0.2)" },
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: {
+                                            color: "#9ca3af",
+                                            callback: (value) => usdFormatter.format(value),
+                                        },
+                                        grid: { color: "rgba(107, 114, 128, 0.2)" },
+                                    },
+                                },
+                            },
+                        });
+                    }
+                }
+            }
+
+            const pendingTotal = target.querySelector("#pending-total");
+            if (pendingTotal) {
+                const pendingFormatter = new Intl.NumberFormat("de-DE", {
+                    style: "currency",
+                    currency: pendingTotal.dataset.currency,
+                });
+                pendingTotal.textContent =
+                    `Pending: ${pendingFormatter.format(Number(pendingTotal.dataset.value))}`;
+            }
+
+            const canvas = target.querySelector("#yield-chart");
+            const dataElement = target.querySelector("#yield-chart-data");
+            if (!canvas || !dataElement) {
+                return;
+            }
+            if (typeof Chart === "undefined") {
+                console.error("Chart.js is unavailable; the yield chart cannot be rendered.");
+                return;
+            }
+
+            const data = JSON.parse(dataElement.textContent);
+            const currencyFormatter = new Intl.NumberFormat("de-DE", {
+                style: "currency",
+                currency: data.currency,
+            });
+            const chartTotal = data.datasets.reduce(
+                (total, dataset) =>
+                    total + dataset.data.reduce((sum, value) => sum + (Number(value) || 0), 0),
+                0,
+            );
+            target.querySelector("#yield-chart-total").textContent =
+                `Summe: ${currencyFormatter.format(chartTotal)}`;
+            new Chart(canvas, {
+                type: "bar",
+                data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: "index", intersect: false },
+                    plugins: {
+                        legend: { position: "bottom", labels: { color: "#d1d5db" } },
+                        tooltip: {
+                            filter: (item) => Number(item.raw) !== 0,
+                            callbacks: {
+                                label: (context) =>
+                                    `${context.dataset.label}: ${currencyFormatter.format(context.raw)}`,
+                                footer: (items) => {
+                                    const total = items.reduce(
+                                        (sum, item) => sum + (Number(item.raw) || 0),
+                                        0,
+                                    );
+                                    return ["────────────", `Gesamt: ${currencyFormatter.format(total)}`];
+                                },
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            ticks: { color: "#9ca3af", maxTicksLimit: 14 },
+                            grid: { color: "rgba(107, 114, 128, 0.2)" },
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: {
+                                color: "#9ca3af",
+                                callback: (value) => currencyFormatter.format(value),
+                            },
+                            grid: { color: "rgba(107, 114, 128, 0.2)" },
+                        },
+                    },
+                },
+            });
+        });
+    </script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans p-8">
+    {% block content %}{% endblock %}
+</body>
+</html>

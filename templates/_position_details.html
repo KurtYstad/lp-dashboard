@@ -1,0 +1,237 @@
+<section class="space-y-5" data-live-position-details>
+    <header class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+            <p class="font-semibold text-white">{{ details.protocol }} · {{ details.chain }}</p>
+            <p class="mt-1 text-xs text-gray-400">
+                On-Chain-Abfrage · Live-Tokenkurse (Cache max. 5 Min.) · Snapshot vom {{ details.snapshot_date }}
+            </p>
+        </div>
+        {% if details.explorer_url %}
+        <a href="{{ details.explorer_url }}" target="_blank" rel="noopener noreferrer"
+           class="inline-flex items-center gap-2 rounded bg-gray-700 px-3 py-2 text-sm text-emerald-300 hover:bg-gray-600"
+           aria-label="Position {{ details.position_id }} im Blockchain-Explorer öffnen">
+            <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" class="h-4 w-4">
+                <path d="M11 3h6v6M17 3 9 11M15 11v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"
+                      stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Explorer
+        </a>
+        {% endif %}
+    </header>
+
+    <div>
+        <div data-price-range
+             data-price="{{ details.price }}"
+             data-lower="{{ details.price_lower }}"
+             data-upper="{{ details.price_upper }}"
+             data-inverted="false">
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h3 class="font-semibold text-gray-100">Aktuelle Range</h3>
+                <label class="inline-flex cursor-pointer items-center gap-2 text-xs text-gray-300">
+                    <input type="checkbox" data-invert-price
+                           onchange="window.invertPositionPrice(this)"
+                           class="rounded border-gray-500 bg-gray-800 text-emerald-500">
+                    Kurs invertieren
+                    <span>({{ details.tokens[0].symbol }} ↔ {{ details.tokens[1].symbol }})</span>
+                </label>
+            </div>
+            <div data-range-bar
+                 class="relative h-3 rounded-full {% if details.in_range %}bg-emerald-500/80{% else %}bg-red-500/80{% endif %}"
+                 role="img"
+                 aria-label="{% if details.in_range %}Position innerhalb der Range{% else %}Position außerhalb der Range{% endif %}">
+                <span data-range-marker
+                      class="absolute -top-1 h-5 w-0.5 bg-white shadow"
+                      style="left: {{ details.price_marker }}%"></span>
+            </div>
+            <div class="mt-2 flex justify-between gap-4 text-xs text-gray-300">
+                <span>
+                    Min: <strong data-range-min>{{ details.price_lower|de_number(8, significant=true) }}</strong>
+                </span>
+                <span class="text-right">
+                    Max: <strong data-range-max>{{ details.price_upper|de_number(8, significant=true) }}</strong>
+                </span>
+            </div>
+            <p class="mt-2 text-center text-sm text-gray-200">
+                Aktueller Kurs:
+                <strong data-range-current>{{ details.price|de_number(8, significant=true) }}</strong>
+                <span data-price-pair
+                      data-base-symbol="{{ details.tokens[0].symbol }}"
+                      data-quote-symbol="{{ details.tokens[1].symbol }}">
+                    {{ details.tokens[1].symbol }} pro {{ details.tokens[0].symbol }}
+                </span>
+                <span class="ml-1 {% if details.in_range %}text-emerald-300{% else %}text-red-300{% endif %}">
+                    ({{ "innerhalb" if details.in_range else "außerhalb" }})
+                </span>
+            </p>
+        </div>
+    </div>
+
+    <div>
+        <h3 class="mb-2 font-semibold text-gray-100">Token in der Position</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+                <thead class="text-xs uppercase text-gray-400">
+                    <tr>
+                        <th class="py-2 pr-3">Token</th>
+                        <th class="py-2 pr-3 text-right">Menge</th>
+                        <th class="py-2 text-right">Wert ({{ details.currency }})</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-700">
+                    {% for token in details.tokens %}
+                    <tr>
+                        <td class="py-2 pr-3">
+                            {% if token.icon_url %}
+                            <img src="{{ token.icon_url }}" alt="" title="Token-Icon von Trust Wallet Assets (MIT)" class="mr-2 inline-block h-6 w-6 rounded-full">
+                            {% else %}
+                            <span class="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-gray-700 text-[10px] font-bold text-emerald-200">
+                                {{ token.symbol[:3] }}
+                            </span>
+                            {% endif %}
+                            <span class="font-medium text-white">{{ token.symbol }}</span>
+                            <span class="block break-all font-mono text-[10px] text-gray-500">{{ token.address }}</span>
+                        </td>
+                        <td class="py-2 pr-3 text-right font-mono">
+                            {{ token.amount|de_number(8) }}
+                            {% if token.initial_amount is defined %}
+                            <span class="block text-xs {% if token.amount_change_positive %}text-emerald-300{% else %}text-red-300{% endif %}">
+                                Ursprünglich: {{ token.initial_amount|de_number(8) }}
+                                ({{ token.amount_change|de_number(8, signed=true) }})
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="whitespace-nowrap py-2 text-right font-mono">
+                            {% if token.value is not none %}
+                                {{ details.symbol }} {{ token.value|de_number(2) }}
+                            {% else %}
+                                Kurs nicht verfügbar
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="font-semibold text-white">
+                        <td colspan="2" class="py-2 pr-3">Aktueller Positionswert</td>
+                        <td class="whitespace-nowrap py-2 text-right font-mono">
+                            {% if details.position_value is not none %}
+                                <span class="{% if details.position_value_change is not none and details.position_value_change >= 0 %}text-emerald-300{% elif details.position_value_change is not none %}text-red-300{% endif %}">
+                                    {{ details.symbol }} {{ details.position_value|de_number(2) }}
+                                </span>
+                            {% else %}
+                                Nicht vollständig bewertbar
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% if details.initial_value is not none %}
+                    <tr class="text-gray-300">
+                        <td colspan="2" class="py-2 pr-3">Ursprünglicher Positionswert</td>
+                        <td class="whitespace-nowrap py-2 text-right font-mono">
+                            {{ details.symbol }} {{ details.initial_value|de_number(2) }}
+                            {% if details.position_value_change is not none %}
+                            <span class="block {% if details.position_value_change >= 0 %}text-emerald-300{% else %}text-red-300{% endif %}">
+                                ({{ details.position_value_change|de_number(2, signed=true) }})
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <div>
+        <h3 class="mb-2 font-semibold text-gray-100">Claimable Fees / Rewards</h3>
+        <div class="space-y-1">
+            {% for fee in details.fees %}
+            <p class="flex justify-between gap-3 text-sm text-gray-300">
+                <span>{{ fee.symbol }}: {{ fee.amount|de_number(8) }}</span>
+                <span class="font-mono">
+                    {% if fee.value is not none %}
+                        {{ details.symbol }} {{ fee.value|de_number(2) }}
+                    {% else %}
+                        Kurs nicht verfügbar
+                    {% endif %}
+                </span>
+            </p>
+            {% endfor %}
+            <p class="flex justify-between gap-3 border-t border-gray-700 pt-2 font-semibold text-white">
+                <span>Summe Fees / Rewards</span>
+                <span class="font-mono">
+                    {% if details.fees_value is not none %}
+                        {{ details.symbol }} {{ details.fees_value|de_number(2) }}
+                    {% else %}
+                        Nicht vollständig bewertbar
+                    {% endif %}
+                </span>
+            </p>
+        </div>
+    </div>
+
+    <div class="space-y-5">
+        <section>
+            <h3 class="mb-2 font-semibold text-gray-100">Kursverlauf der letzten 24 Stunden</h3>
+            <p class="mb-2 text-xs text-gray-400">
+                {{ details.tokens[1].symbol }} pro {{ details.tokens[0].symbol }}
+            </p>
+            {% if chart_data.prices.labels %}
+            <div class="h-64">
+                <canvas id="position-price-chart" aria-label="Kursverlauf mit Positionslimits"></canvas>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400">Für die letzten 24 Stunden sind keine Kurssnapshots vorhanden.</p>
+            {% endif %}
+        </section>
+        <section>
+            <h3 class="mb-2 font-semibold text-gray-100">Erträge pro Stunde (USD je Token)</h3>
+            {% if chart_data.earnings.datasets %}
+            <div class="h-64">
+                <canvas id="position-earnings-chart" aria-label="Erträge pro Stunde, nach Token gruppiert"></canvas>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-400">
+                {% if chart_data.earnings.unpriced_count %}
+                    Für die letzten 24 Stunden konnten keine Erträge mit vorhandenem USD-Quote bewertet werden.
+                {% else %}
+                    Für die letzten 24 Stunden sind keine Ertragseinträge vorhanden.
+                {% endif %}
+            </p>
+            {% endif %}
+            {% if chart_data.earnings.unpriced_count %}
+            <p class="mt-2 text-xs text-amber-300" role="status">
+                {{ chart_data.earnings.unpriced_count|de_number(0) }} Ertragseinträge konnten mangels historischem USD-Quote nicht bewertet werden.
+            </p>
+            {% endif %}
+        </section>
+        <script type="application/json" id="position-chart-data">{{ chart_data|tojson }}</script>
+    </div>
+
+    <div>
+        <h3 class="mb-2 font-semibold text-gray-100">Performance der Position</h3>
+        {% if details.initial_value is not none %}
+        <dl class="space-y-2 text-sm">
+            {% for label, key in [
+                ("Fees und Rewards", "fees_rewards_return"),
+                ("Wert LP Token", "position_return"),
+                ("Gesamt", "total_roi"),
+                ("Abweichungsverlust (IL)", "impermanent_loss")
+            ] %}
+            {% set value = details.performance[key] %}
+            <div class="flex justify-between gap-3 border-b border-gray-700/70 pb-2">
+                <dt class="text-gray-300">{{ label }}</dt>
+                <dd class="font-mono font-semibold
+                    {% if value is none %}text-gray-400
+                    {% elif value >= 0 %}text-emerald-300
+                    {% else %}text-red-300{% endif %}">
+                    {% if value is not none %}{{ value|de_number(2, signed=true) }} %{% else %}Nicht verfügbar{% endif %}
+                </dd>
+            </div>
+            {% endfor %}
+        </dl>
+        {% else %}
+        <p class="text-sm text-gray-400">Keine vollständigen Initialdaten für diese Position vorhanden.</p>
+        {% endif %}
+    </div>
+
+</section>

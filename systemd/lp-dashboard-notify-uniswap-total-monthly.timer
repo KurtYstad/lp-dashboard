@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Uniswap monthly total notifier at 00:10 on day 1
+
+[Timer]
+OnCalendar=*-*-01 00:10:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-uniswap-total-monthly.service
+
+[Install]
+WantedBy=timers.target

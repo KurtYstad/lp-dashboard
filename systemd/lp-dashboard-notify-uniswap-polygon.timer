@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Uniswap Polygon notifier hourly at minute 2
+
+[Timer]
+OnCalendar=*-*-* *:02:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-uniswap-polygon.service
+
+[Install]
+WantedBy=timers.target

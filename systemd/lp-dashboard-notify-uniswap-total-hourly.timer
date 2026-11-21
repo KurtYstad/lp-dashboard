@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Uniswap total notifier hourly at minute 9
+
+[Timer]
+OnCalendar=*-*-* *:09:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-uniswap-total-hourly.service
+
+[Install]
+WantedBy=timers.target

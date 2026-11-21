@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Aerodrome notifier hourly at minute 8
+
+[Timer]
+OnCalendar=*-*-* *:08:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-aero.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=LP dashboard Uniswap monthly total notifier
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=@SERVICE_USER@
+WorkingDirectory=@PROJECT_DIR@/notify/uniswap/total
+ExecStart=@PROJECT_DIR@/.venv/bin/python -u @PROJECT_DIR@/notify/uniswap/total/monthly.py
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal

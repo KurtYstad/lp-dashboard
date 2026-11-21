@@ -1,0 +1,8 @@
+<select id="position-id" name="position_id" hx-swap-oob="outerHTML"
+        class="w-full rounded border border-gray-600 bg-gray-700 p-2 text-white">
+    <option value="">Alle Positionen</option>
+    <option value="__open_positions__"{% if selected_position_id == "__open_positions__" %} selected{% endif %}>Offene Positionen</option>
+    {% for position_id in position_ids %}
+    <option value="{{ position_id }}"{% if position_id == selected_position_id %} selected{% endif %}>{{ position_id }}</option>
+    {% endfor %}
+</select>

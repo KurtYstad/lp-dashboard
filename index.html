@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LP Yield Dashboard</title>
+    <!-- HTMX und Tailwind CSS via CDN laden -->
+    <script src="https://unpkg.com"></script>
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-emerald-400 flex items-center gap-2">
+                📈 LP Yield Dashboard
+            </h1>
+            <p class="text-gray-400 text-sm mt-1">Stündliche Ertragsanalyse aus MariaDB mit On-Chain Preisen</p>
+        </header>
+        
+        <!-- Filter-Formular: Gesteuert durch HTMX -->
+        <form hx-post="/update-dashboard" 
+              hx-target="#table-container" 
+              hx-trigger="change, load" 
+              class="grid grid-cols-2 md:grid-cols-5 gap-4 bg-gray-800 p-6 rounded-xl mb-8 shadow-lg border border-gray-700">
+            
+            <div>
+                <label class="block text-xs uppercase tracking-wider text-gray-400 mb-2 font-semibold">Blockchain</label>
+                <select name="blockchain" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-emerald-400">
+                    <option value="all">Alle Blockchains</option>
+                    {% for bc in blockchains %}
+                    <option value="{{ bc }}">{{ bc }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs uppercase tracking-wider text-gray-400 mb-2 font-semibold">Token</label>
+                <select name="token" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-emerald-400">
+                    <option value="all">Alle Tokens</option>
+                    {% for t in tokens %}
+                    <option value="{{ t }}">{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs uppercase tracking-wider text-gray-400 mb-2 font-semibold">Zeitraum</label>
+                <select name="period" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-emerald-400">
+                    <option value="D">Tage</option>
+                    <option value="W">Wochen</option>
+                    <option value="M">Monate</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-xs uppercase tracking-wider text-gray-400 mb-2 font-semibold">Währung</label>
+                <select name="currency" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white focus:outline-none focus:border-emerald-400">
+                    <option value="USD">USD ($)</option>
+                    <option value="EUR">EUR (€)</option>
+                </select>
+            </div>
+
+            <div class="col-span-2 md:col-span-1 flex items-end">
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold p-2 rounded transition cursor-pointer shadow">
+                    Aktualisieren
+                </button>
+            </div>
+        </form>
+
+        <!-- Hier injiziert HTMX dynamisch die Tabelle hinein -->
+        <div id="table-container" class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
+            <div class="flex items-center justify-center p-8 gap-3">
+                <span class="text-gray-400">Lade Dashboard-Daten und On-Chain Kurse...</span>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

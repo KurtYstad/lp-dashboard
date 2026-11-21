@@ -1,0 +1,58 @@
+{% if not groups and not incomplete_positions %}
+<p class="text-sm text-gray-400">Keine aktuellen Token-Anteile in offenen Positionen gefunden.</p>
+{% else %}
+{% if incomplete_positions or unpriced_tokens %}
+<p class="mb-4 rounded bg-amber-900/50 p-3 text-sm text-amber-200" role="status">
+    {% if incomplete_positions %}{{ incomplete_positions|de_number(0) }} Position(en) konnten nicht geladen werden.{% endif %}
+    {% if unpriced_tokens %}Für {{ unpriced_tokens|de_number(0) }} Token-Anteil(e) fehlt der aktuelle Kurs.{% endif %}
+    Die betroffenen Werte sind nicht in den Summen enthalten.
+</p>
+{% endif %}
+<div class="space-y-4">
+    {% for group in groups %}
+    <section class="rounded-lg border border-gray-700 bg-gray-800/40 p-4">
+        <h3 class="mb-3 flex items-center gap-2 text-lg font-semibold text-white">
+            <span class="flex -space-x-2">
+                {% for icon_url in group.icons[:4] %}
+                <img src="{{ icon_url }}" alt="" class="h-7 w-7 rounded-full border-2 border-gray-800 bg-gray-700">
+                {% endfor %}
+                {% if not group.icons %}
+                <span class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gray-700 text-[10px] font-bold text-emerald-200">
+                    {{ group.symbol[:3] }}
+                </span>
+                {% endif %}
+            </span>
+            <span>{{ group.symbol }}</span>
+        </h3>
+        <div class="space-y-2 text-sm">
+            {% for row in group.rows %}
+            <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                <span class="flex items-center gap-2 text-gray-300">
+                    {% if row.icons %}
+                    <img src="{{ row.icons[0] }}" alt="" class="h-5 w-5 rounded-full">
+                    {% endif %}
+                    {{ row.chain_label }}
+                </span>
+                <span class="ml-auto font-mono text-gray-200">{{ row.amount|de_number(8) }} {{ row.symbols|join(" / ") }}</span>
+                <span class="min-w-28 text-right font-mono text-white">
+                    {% if row.complete %}{{ symbol }} {{ row.value|de_number(2) }}{% else %}Kurs nicht verfügbar{% endif %}
+                </span>
+            </div>
+            {% endfor %}
+            <div class="flex justify-between gap-4 border-t border-gray-600 pt-2 font-semibold">
+                <span class="text-gray-200">Summe {{ group.symbol }}</span>
+                <span class="font-mono text-white">
+                    {% if group.value is not none %}{{ symbol }} {{ group.value|de_number(2) }}{% else %}Nicht vollständig verfügbar{% endif %}
+                </span>
+            </div>
+        </div>
+    </section>
+    {% endfor %}
+</div>
+<div class="mt-5 flex justify-between gap-4 border-t-2 border-gray-500 pt-3 font-semibold text-white">
+    <span>Gesamtwert aller Token ({{ currency }})</span>
+    <span class="whitespace-nowrap font-mono">
+        {% if total_value is not none %}{{ symbol }} {{ total_value|de_number(2) }}{% else %}Nicht vollständig verfügbar{% endif %}
+    </span>
+</div>
+{% endif %}

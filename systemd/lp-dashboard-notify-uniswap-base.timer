@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Uniswap Base notifier hourly at minute 3
+
+[Timer]
+OnCalendar=*-*-* *:03:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-uniswap-base.service
+
+[Install]
+WantedBy=timers.target

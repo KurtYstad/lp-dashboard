@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Uniswap Ethereum notifier hourly at minute 1
+
+[Timer]
+OnCalendar=*-*-* *:01:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-uniswap-ethereum.service
+
+[Install]
+WantedBy=timers.target

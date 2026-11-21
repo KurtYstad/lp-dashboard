@@ -1,0 +1,180 @@
+{% if not rows %}
+<p class="text-sm text-gray-400">Keine offenen Positionen gefunden.</p>
+{% else %}
+<div class="overflow-x-auto">
+    <div class="mb-4 flex flex-wrap items-center gap-4">
+        <label class="inline-flex cursor-pointer items-center gap-3 text-sm text-gray-300">
+            <input type="checkbox"
+                   data-performance-active-filter
+                   class="peer sr-only">
+            <span class="relative h-6 w-11 rounded-full bg-gray-600 transition peer-checked:bg-emerald-600 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-emerald-400 after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-transform peer-checked:after:translate-x-5"
+                  aria-hidden="true"></span>
+            Nur aktive Positionen
+        </label>
+        <label class="flex items-center gap-2 text-sm text-gray-300">
+            Protokoll
+            <select data-performance-protocol-filter
+                    class="rounded border border-gray-600 bg-gray-700 p-2 text-white">
+                <option value="">Alle Protokolle</option>
+                {% for protocol in protocols %}
+                <option value="{{ protocol|lower }}">{{ protocol }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="flex items-center gap-2 text-sm text-gray-300">
+            Blockchain
+            <select data-performance-blockchain-filter
+                    class="rounded border border-gray-600 bg-gray-700 p-2 text-white">
+                <option value="">Alle Blockchains</option>
+                {% for chain, label in chains %}
+                <option value="{{ chain }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <p class="flex flex-wrap gap-3 text-xs text-gray-400">
+            <span class="inline-flex items-center gap-1.5">
+                <span class="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-400" aria-hidden="true"></span>
+                In Range, Fees aktiv
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+                <span class="inline-block h-2.5 w-2.5 rounded-sm bg-red-400" aria-hidden="true"></span>
+                Außerhalb der Range
+            </span>
+        </p>
+    </div>
+    <table class="w-full min-w-[48rem] text-left text-sm" data-performance-table>
+        <thead class="text-xs uppercase tracking-wide text-gray-400">
+            <tr class="border-b border-gray-700">
+                <th class="py-2 pr-3" aria-sort="descending">
+                    <button type="button" data-performance-sort-column="0" data-sort-type="number"
+                            class="hover:text-white focus:text-white">
+                        Alter der Position (Tage) <span aria-hidden="true">↓</span>
+                    </button>
+                </th>
+                <th class="py-2 pr-3">Position</th>
+                <th class="py-2 px-3 text-right" aria-sort="none">
+                    <button type="button" data-performance-sort-column="2" data-sort-type="number"
+                            class="hover:text-white focus:text-white">
+                        LP-Token ({{ currency }}) <span aria-hidden="true">↕</span>
+                    </button>
+                </th>
+                <th class="py-2 px-3 text-right" aria-sort="none">
+                    <button type="button" data-performance-sort-column="3" data-sort-type="number"
+                            class="hover:text-white focus:text-white">
+                        Gesammelte Fees ({{ currency }}) <span aria-hidden="true">↕</span>
+                    </button>
+                </th>
+                <th class="py-2 pl-3 text-right" aria-sort="none">
+                    <button type="button" data-performance-sort-column="4" data-sort-type="number"
+                            class="hover:text-white focus:text-white">
+                        Summe ({{ currency }}) <span aria-hidden="true">↕</span>
+                    </button>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700/70">
+            {% for row in rows %}
+            <tr data-performance-row
+                data-active="{{ 'true' if row.in_range else 'false' }}"
+                data-protocol="{{ row.protocol|lower }}"
+                data-chain="{{ row.chain }}">
+                <td data-sort-value="{{ row.age_days if row.age_days is not none else '' }}"
+                    class="whitespace-nowrap py-2 pr-3 text-gray-300">
+                    {{ row.age_days if row.age_days is not none else "—" }}
+                </td>
+                <td class="py-2 pr-3">
+                    <span class="inline-flex items-center gap-2 text-gray-200">
+                        <span class="inline-block h-2.5 w-2.5 shrink-0 rounded-sm
+                            {% if row.in_range is sameas true %}bg-emerald-400
+                            {% elif row.in_range is sameas false %}bg-red-400
+                            {% else %}bg-gray-500{% endif %}"
+                              role="img"
+                              aria-label="{% if row.in_range is sameas true %}Aktiv: innerhalb der Range, Fees werden generiert
+                                  {% elif row.in_range is sameas false %}Inaktiv: außerhalb der Range
+                                  {% else %}Range-Status unbekannt{% endif %}"></span>
+                        {{ row.chain_label }} · {{ row.protocol }} ·
+                        {% for token in row.tokens %}
+                        {% if not loop.first %}<span aria-hidden="true">/</span>{% endif %}
+                        <span class="inline-flex items-center gap-1">
+                            {% if token.icon_url %}
+                            <img src="{{ token.icon_url }}" alt="" class="h-4 w-4 rounded-full" aria-hidden="true">
+                            {% else %}
+                            <span class="inline-flex h-4 w-4 items-center justify-center rounded-full bg-gray-700 text-[8px] font-bold text-emerald-200" aria-hidden="true">{{ token.symbol[:1] }}</span>
+                            {% endif %}
+                            {{ token.symbol }}
+                        </span>
+                        {% endfor %}
+                    </span>
+                    <details class="mt-1 font-sans"
+                             hx-get="{{ request.url_for('position_details', table=row.table, position_id=row.position_id|string) }}?currency={{ currency }}"
+                             hx-trigger="toggle once"
+                             hx-target="#performance-position-details-{{ loop.index }}"
+                             hx-swap="innerHTML"
+                             hx-indicator="#performance-position-details-spinner-{{ loop.index }}">
+                        <summary class="cursor-pointer list-none rounded border border-emerald-700 px-2 py-1 font-sans text-xs text-emerald-300 hover:bg-emerald-900/40">
+                            Position #{{ row.position_id }} · Details ▾
+                        </summary>
+                        <div id="performance-position-details-{{ loop.index }}"
+                             class="mt-2 w-[min(42rem,100%)] max-w-full overflow-x-auto rounded-lg border border-gray-600 bg-gray-900 p-4 text-left text-sm text-gray-200 shadow-xl"
+                             data-position-details>
+                            <div id="performance-position-details-spinner-{{ loop.index }}"
+                                 class="htmx-indicator mb-3 flex items-center gap-2 text-gray-400"
+                                 role="status">
+                                <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-emerald-400"></span>
+                                Lade aktuelle On-Chain-Daten ...
+                            </div>
+                            <p class="text-gray-400">Details werden beim Aufklappen geladen.</p>
+                        </div>
+                    </details>
+                    {% if row.error %}
+                    <span class="block text-xs text-amber-300" title="{{ row.error }}">Wert nicht verfügbar</span>
+                    {% endif %}
+                </td>
+                <td data-sort-value="{{ row.current_value if row.current_value is not none else '' }}"
+                    class="whitespace-nowrap px-3 py-2 text-right align-bottom font-mono">
+                    <span class="text-gray-200">
+                    {% if row.current_value is not none %}{{ symbol }} {{ row.current_value|de_number(2) }}{% else %}—{% endif %}
+                    </span><br>
+                    <span class="{% if row.position_change is none %}text-gray-500{% elif row.position_change >= 0 %}text-emerald-300{% else %}text-red-300{% endif %}">
+                    {% if row.position_change is not none %}{{ row.position_change|de_number(2, signed=true) }}{% else %}—{% endif %}
+                    </span>
+                </td>
+                {% for value in [row.collected_fees, row.combined] %}
+                <td data-sort-value="{{ value if value is not none else '' }}"
+                    class="whitespace-nowrap px-3 py-2 text-right align-bottom font-mono
+                    {% if value is none %}text-gray-500
+                    {% elif value >= 0 %}text-emerald-300
+                    {% else %}text-red-300{% endif %}">
+                    {{ value|de_number(2, signed=true) if value is not none else "—" }}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr class="border-t-2 border-gray-500 font-semibold">
+                <td colspan="2" class="py-3 pr-3 text-white">Gesamtsumme ({{ currency }})</td>
+                <td class="whitespace-nowrap px-3 py-3 text-right align-bottom font-mono">
+                    <span>
+                        {% if total_current_value is not none %}{{ symbol }} {{ total_current_value|de_number(2) }}{% else %}—{% endif %}
+                    </span><br>
+                    <span class="{% if total_position_change >= 0 %}text-emerald-300{% else %}text-red-300{% endif %}">
+                        {{ symbol }} {{ total_position_change|de_number(2, signed=true) }}
+                    </span>
+                </td>
+                {% for value in [total_collected_fees, total_combined] %}
+                <td class="whitespace-nowrap px-3 py-3 text-right align-bottom font-mono
+                    {% if value >= 0 %}text-emerald-300{% else %}text-red-300{% endif %}">
+                    {{ symbol }} {{ value|de_number(2, signed=true) }}
+                </td>
+                {% endfor %}
+            </tr>
+        </tfoot>
+    </table>
+</div>
+<p class="mt-2 text-xs text-gray-500">
+    LP-Token = aktueller Positionswert minus ursprünglicher Investitionswert.
+    Gesammelte Fees werden zum aktuellen Kurs bewertet.
+    {% if incomplete_count %}{{ incomplete_count|de_number(0) }} Position(en) konnten nicht vollständig bewertet werden; deren Veränderungs- und Gebührenwerte sind nicht in der Gesamtsumme enthalten.{% endif %}
+</p>
+{% endif %}

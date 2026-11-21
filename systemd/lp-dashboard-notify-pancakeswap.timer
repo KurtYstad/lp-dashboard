@@ -1,0 +1,11 @@
+[Unit]
+Description=Run PancakeSwap notifier hourly at minute 6
+
+[Timer]
+OnCalendar=*-*-* *:06:00
+AccuracySec=1s
+Persistent=false
+Unit=lp-dashboard-notify-pancakeswap.service
+
+[Install]
+WantedBy=timers.target

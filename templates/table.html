@@ -1,0 +1,285 @@
+{% include "_position_filter.html" %}
+<div class="overflow-x-auto">
+    {% if chart_data %}
+    <section class="mb-8 rounded bg-gray-900/60 p-4" aria-labelledby="yield-chart-heading">
+        <div class="mb-2 flex items-center justify-between gap-4">
+            <h2 id="yield-chart-heading" class="text-lg font-semibold text-white">
+                Ertragswert nach Token ({{ currency }})
+            </h2>
+            <div class="shrink-0 rounded bg-gray-800/90 px-3 py-1 text-right text-sm font-semibold text-white">
+                <p id="yield-chart-total" role="status"></p>
+                {% if pending_total is not none %}
+                <p id="pending-total"
+                   data-value="{{ pending_total }}"
+                   data-currency="{{ currency }}"
+                   role="status"></p>
+                {% else %}
+                <p class="text-amber-300" role="status">
+                    Pending nicht vollständig verfügbar
+                    ({{ pending_price_errors|length|de_number(0) }} Kurs-/Umrechnungsfehler).
+                </p>
+                {% endif %}
+            </div>
+        </div>
+        <p class="mb-4 text-sm text-gray-400">
+            Gestapelte Summen der gefilterten Tokens. Blockchain-, Positions- und Tokenfilter gelten.
+        </p>
+        <div class="relative h-96">
+            <canvas id="yield-chart" role="img" aria-label="Gestapeltes Balkendiagramm der Ertragswerte nach Zeitraum und Token"></canvas>
+        </div>
+        <script id="yield-chart-data" type="application/json">{{ chart_data|tojson }}</script>
+    </section>
+    {% else %}
+    <p class="mb-8 rounded bg-gray-900/60 p-4 text-right text-sm font-semibold text-white" role="status">
+        {% if pending_total is not none %}
+        <span id="pending-total"
+              data-value="{{ pending_total }}"
+              data-currency="{{ currency }}"></span>
+        {% else %}
+        <span class="text-amber-300">
+            Pending nicht vollständig verfügbar
+            ({{ pending_price_errors|length|de_number(0) }} Kurs-/Umrechnungsfehler).
+        </span>
+        {% endif %}
+    </p>
+    {% endif %}
+    <details class="group my-10 rounded border border-gray-700 bg-gray-900/60"
+             hx-get="{{ request.url_for('portfolio_total_summary') }}?currency={{ currency }}"
+             hx-trigger="toggle once"
+             hx-target="#portfolio-total-summary"
+             hx-swap="innerHTML"
+             hx-indicator="#portfolio-total-summary-spinner">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 rounded bg-gray-800/70 px-5 py-4 font-semibold text-white hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
+            <span class="flex items-center gap-3">
+                <span class="inline-flex h-6 w-6 shrink-0 items-center justify-center text-xl text-emerald-300" aria-hidden="true">∑</span>
+                <span>
+                    Portfolio-Gesamtwert
+                    <span class="ml-1 text-xs font-normal text-gray-300">aufklappen zum Laden</span>
+                </span>
+            </span>
+            <svg class="h-5 w-5 shrink-0 text-gray-300 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+            </svg>
+        </summary>
+        <div id="portfolio-total-summary"
+             class="border-t border-gray-700 p-4"
+             data-portfolio-total-summary>
+            <div id="portfolio-total-summary-spinner"
+                 class="htmx-indicator flex items-center gap-2 text-sm text-gray-400"
+                 role="status">
+                <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-emerald-400"></span>
+                Lade den Portfolio-Gesamtwert ...
+            </div>
+            <p class="text-sm text-gray-400">Die Daten werden erst beim Aufklappen geladen.</p>
+        </div>
+    </details>
+    <details class="group -mt-8 mb-10 rounded border border-gray-700 bg-gray-900/60"
+             hx-get="{{ request.url_for('position_performance_summary') }}?currency={{ currency }}"
+             hx-trigger="toggle once"
+             hx-target="#position-performance-summary"
+             hx-swap="innerHTML"
+             hx-indicator="#position-performance-summary-spinner">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 rounded bg-gray-800/70 px-5 py-4 font-semibold text-white hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
+            <span class="flex items-center gap-3">
+                <svg class="h-5 w-5 shrink-0 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M7 14l4-4 4 4 6-7" />
+                </svg>
+                <span>
+                    Wertentwicklung aller Positionen
+                    <span class="ml-1 text-xs font-normal text-gray-300">aufklappen zum Laden</span>
+                </span>
+            </span>
+            <svg class="h-5 w-5 shrink-0 text-gray-300 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+            </svg>
+        </summary>
+        <div id="position-performance-summary"
+             class="border-t border-gray-700 p-4"
+             data-performance-summary>
+            <div id="position-performance-summary-spinner"
+                 class="htmx-indicator flex items-center gap-2 text-sm text-gray-400"
+                 role="status">
+                <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-emerald-400"></span>
+                Lade aktuelle Werte aller offenen Positionen ...
+            </div>
+            <p class="text-sm text-gray-400">Die Daten werden erst beim Aufklappen geladen.</p>
+        </div>
+    </details>
+    <details class="group -mt-8 mb-10 rounded border border-gray-700 bg-gray-900/60"
+             hx-get="{{ request.url_for('token_holdings_summary') }}?currency={{ currency }}"
+             hx-trigger="toggle once"
+             hx-target="#token-holdings-summary"
+             hx-swap="innerHTML"
+             hx-indicator="#token-holdings-summary-spinner">
+        <summary class="flex cursor-pointer list-none items-center justify-between gap-4 rounded bg-gray-800/70 px-5 py-4 font-semibold text-white hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-400">
+            <span class="flex items-center gap-3">
+                <svg class="h-5 w-5 shrink-0 text-emerald-300" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 20V12h3v8H4Zm6 0V6h3v14h-3Zm6 0V9h3v11h-3Z" fill="currentColor" />
+                </svg>
+                <span>
+                    Token-Anteile
+                    <span class="ml-1 text-xs font-normal text-gray-300">aufklappen zum Laden</span>
+                </span>
+            </span>
+            <svg class="h-5 w-5 shrink-0 text-gray-300 transition-transform group-open:rotate-180" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                <path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+            </svg>
+        </summary>
+        <div id="token-holdings-summary"
+             class="border-t border-gray-700 p-4"
+             data-token-holdings-summary>
+            <div id="token-holdings-summary-spinner"
+                 class="htmx-indicator flex items-center gap-2 text-sm text-gray-400"
+                 role="status">
+                <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-emerald-400"></span>
+                Lade aktuelle Token-Anteile aller offenen Positionen ...
+            </div>
+            <p class="text-sm text-gray-400">Die Daten werden erst beim Aufklappen geladen.</p>
+        </div>
+    </details>
+    {% if view == "token_totals" %}
+    <p class="mb-4 rounded bg-sky-900/50 p-4 text-sky-200" role="status">
+        Summen sind nach Token-Symbol über alle Blockchains und Positionen aggregiert.
+        Blockchain- und Positionsfilter werden in dieser Ansicht nicht angewendet.
+    </p>
+    {% endif %}
+    {% if price_errors %}
+    <p class="mb-4 rounded bg-amber-900/50 p-4 text-amber-200" role="status">
+        Für {{ price_errors|length|de_number(0) }} Token konnte kein Kurs ermittelt werden.
+        Die Ertragsmenge bleibt sichtbar; der Gegenwert wird für diese Einträge nicht ausgewiesen.{% if has_unpriced_rows %}
+        <a href="#"
+           hx-post="{{ request.url_for('update_dashboard') }}"
+           hx-include="#dashboard-filters"
+           hx-vals='{"missing_price_only": {{ "false" if missing_price_only else "true" }}}'
+           hx-target="#table-container"
+           class="underline hover:text-amber-100">[{{ "alle anzeigen" if missing_price_only else "anzeigen" }}]</a>
+        {% endif %}
+    </p>
+    {% endif %}
+    {% if chart_price_errors %}
+    <p class="mb-4 rounded bg-amber-900/50 p-4 text-amber-200" role="status">
+        Für {{ chart_price_errors|length|de_number(0) }} weitere Token im Diagramm konnte kein Kurs ermittelt werden.
+    </p>
+    {% endif %}
+    {% if missing_amount_count %}
+    <p class="mb-4 rounded bg-amber-900/50 p-4 text-amber-200" role="status">
+        Für {{ missing_amount_count|de_number(0) }} Datensätze fehlt der Ertragsbetrag.
+    </p>
+    {% endif %}
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <label for="table-page-size" class="text-sm text-gray-400">
+            Einträge pro Seite
+            <select id="table-page-size" class="ml-2 rounded border border-gray-600 bg-gray-700 p-2 text-white">
+                <option value="100" selected>100</option>
+                <option value="500">500</option>
+                <option value="1000">1.000</option>
+                <option value="all">Alle</option>
+            </select>
+        </label>
+        <div class="flex items-center gap-3">
+            <span id="table-page-summary" class="text-sm text-gray-400" aria-live="polite"></span>
+            <button type="button" data-page-action="previous" class="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50">
+                Zurück
+            </button>
+            <span id="table-page-indicator" class="text-sm text-gray-400"></span>
+            <button type="button" data-page-action="next" class="rounded bg-gray-700 px-3 py-2 text-sm text-white hover:bg-gray-600 disabled:cursor-not-allowed disabled:opacity-50">
+                Weiter
+            </button>
+        </div>
+    </div>
+    <table class="w-full text-left border-collapse">
+        <thead>
+            <tr class="border-b border-gray-700 text-gray-400 uppercase text-xs tracking-wider">
+                <th class="py-3 px-4" aria-sort="none">
+                    <button type="button" data-sort-column="0" data-sort-type="text" class="hover:text-white focus:text-white">Zeitraum <span aria-hidden="true">↕</span></button>
+                </th>
+                <th class="py-3 px-4" aria-sort="none">
+                    <button type="button" data-sort-column="1" data-sort-type="text" class="hover:text-white focus:text-white">Blockchain <span aria-hidden="true">↕</span></button>
+                </th>
+                <th class="py-3 px-4" aria-sort="none">
+                    <button type="button" data-sort-column="2" data-sort-type="text" class="hover:text-white focus:text-white">Position ID <span aria-hidden="true">↕</span></button>
+                </th>
+                <th class="py-3 px-4" aria-sort="none">
+                    <button type="button" data-sort-column="3" data-sort-type="number" class="hover:text-white focus:text-white">Token Ertrag <span aria-hidden="true">↕</span></button>
+                </th>
+                <th class="py-3 px-4 text-right" aria-sort="none">
+                    <button type="button" data-sort-column="4" data-sort-type="number" class="hover:text-white focus:text-white">Gegenwert ({{ currency }}) <span aria-hidden="true">↕</span></button>
+                </th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-700">
+            {% if not records %}
+            <tr>
+                <td colspan="5" class="py-4 text-center text-gray-400">
+                    Keine Tabelleneinträge für die gewählten Filter.
+                </td>
+            </tr>
+            {% endif %}
+            {% for row in records %}
+            {% set dashboard_row_index = loop.index0 %}
+            <tr data-dashboard-row class="hover:bg-gray-750 transition">
+                <td data-sort-value="{{ row.timestamp.strftime('%Y-%m-%d') }}" class="py-4 px-4 font-mono text-sm text-gray-300">
+                    {{ row.timestamp.strftime('%Y-%m-%d') }}
+                </td>
+                <td data-sort-value="{% if view == 'token_totals' %}Alle{% else %}{{ row.chain }}{% endif %}" class="py-4 px-4"><span class="px-2 py-1 bg-gray-700 rounded text-xs">{% if view == "token_totals" %}Alle{% else %}{{ row.chain }}{% endif %}</span></td>
+                <td data-sort-value="{% if view == 'token_totals' %}Alle{% elif row.pos_id is not none %}{{ row.pos_id }}{% endif %}" class="py-4 px-4 text-gray-400 font-mono text-sm">
+                    {% if view == "token_totals" %}
+                        Alle
+                    {% elif row.pos_id is not none %}
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button type="button"
+                                    hx-post="{{ request.url_for('update_dashboard') }}"
+                                    hx-include="#dashboard-filters"
+                                    hx-vals='{"position_id": {{ row.pos_id|string|tojson }}, "missing_price_only": {{ missing_price_only|tojson }}}'
+                                    hx-target="#table-container"
+                                    aria-label="Nach Position {{ row.pos_id }} filtern"
+                                    class="cursor-pointer rounded text-left text-emerald-300 underline decoration-dotted underline-offset-2 hover:text-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                                {{ row.pos_id }}
+                            </button>
+                            {% for source in row.details_sources %}
+                            {% set details_target = "position-details-" ~ dashboard_row_index ~ "-" ~ loop.index ~ "-" ~ source.table ~ "-" ~ row.pos_id %}
+                            <details class="font-sans"
+                                     hx-get="{{ request.url_for('position_details', table=source.table, position_id=row.pos_id|string) }}?currency={{ currency }}"
+                                     hx-trigger="toggle once"
+                                     hx-target="#{{ details_target }}"
+                                     hx-swap="innerHTML"
+                                     hx-indicator="#{{ details_target }}-spinner">
+                                <summary class="cursor-pointer list-none rounded border border-emerald-700 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-900/40"
+                                         aria-label="Details für Position {{ row.pos_id }} aufklappen">
+                                    {{ source.protocol }} ▾
+                                </summary>
+                                <div id="{{ details_target }}"
+                                     class="mt-2 w-[min(42rem,80vw)] rounded-lg border border-gray-600 bg-gray-900 p-4 text-left text-sm text-gray-200 shadow-xl"
+                                     data-position-details>
+                                    <div id="{{ details_target }}-spinner"
+                                         class="htmx-indicator mb-3 flex items-center gap-2 text-gray-400"
+                                         role="status">
+                                        <span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-emerald-400"></span>
+                                        Lade aktuelle On-Chain-Daten ...
+                                    </div>
+                                    <p class="text-gray-400">Details werden beim Aufklappen geladen.</p>
+                                </div>
+                            </details>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </td>
+                <td data-sort-value="{{ row.amount if row.amount is not none else '' }}" data-sort-secondary="{{ row.token_symbol or '' }}" class="py-4 px-4 text-emerald-400 font-semibold">
+                    {% if row.amount is not none %}
+                        {{ row.amount|de_number(4) }} {{ row.token_symbol }}
+                    {% else %}
+                        Ertrag nicht verfügbar
+                    {% endif %}
+                </td>
+                <td data-sort-value="{{ row.value_converted if row.value_converted is not none else '' }}" class="py-4 px-4 text-right font-mono font-bold text-white">
+                    {% if row.value_converted is not none %}
+                        {{ symbol }} {{ row.value_converted|de_number(2) }}
+                    {% else %}
+                        Wert nicht verfügbar
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
