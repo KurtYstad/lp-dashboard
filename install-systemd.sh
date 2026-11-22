@@ -111,12 +111,22 @@ if [[ "$INSTALL_MODE" == "all" ]]; then
         done
     done
 
-    for unit in lp-dashboard-positions.service lp-dashboard-positions.timer; do
+    for unit in \
+        lp-dashboard-positions.service \
+        lp-dashboard-positions.timer \
+        lp-dashboard-backup.service \
+        lp-dashboard-backup.timer
+    do
         if [[ ! -f "$SYSTEMD_SOURCE_DIR/$unit" ]]; then
             echo "Unit file not found: $SYSTEMD_SOURCE_DIR/$unit" >&2
             exit 1
         fi
     done
+
+    if [[ ! -x "$PROJECT_DIR/backup/backup.sh" ]]; then
+        echo "Backup script not found or not executable: $PROJECT_DIR/backup/backup.sh" >&2
+        exit 1
+    fi
 fi
 
 TEMP_UNIT=""
@@ -163,6 +173,8 @@ done
 
 install_unit lp-dashboard-positions.service
 install_unit lp-dashboard-positions.timer
+install_unit lp-dashboard-backup.service
+install_unit lp-dashboard-backup.timer
 
 systemctl daemon-reload
 for unit in "${NOTIFY_UNITS[@]}"; do
@@ -170,5 +182,6 @@ for unit in "${NOTIFY_UNITS[@]}"; do
 done
 
 systemctl enable --now lp-dashboard-positions.timer
+systemctl enable --now lp-dashboard-backup.timer
 
-echo "Installed and enabled ${#NOTIFY_UNITS[@]} notify timers for $SERVICE_USER."
+echo "Installed and enabled ${#NOTIFY_UNITS[@]} notify timers and the positions and database backup timers for $SERVICE_USER."

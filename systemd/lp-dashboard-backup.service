@@ -1,0 +1,20 @@
+[Unit]
+Description=Create and upload LP Dashboard database backup
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=@SERVICE_USER@
+WorkingDirectory=@PROJECT_DIR@/backup
+ExecStart=@PROJECT_DIR@/backup/backup.sh
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=@PROJECT_DIR@/backup
+RestrictSUIDSGID=true
+LockPersonality=true
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the LP Dashboard database backup daily at 23:59
+
+[Timer]
+OnCalendar=*-*-* 23:59:00
+Persistent=true
+AccuracySec=1s
+Unit=lp-dashboard-backup.service
+
+[Install]
+WantedBy=timers.target

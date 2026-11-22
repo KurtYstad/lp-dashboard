@@ -1,11 +1,11 @@
 # LP dashboard systemd services
 
 For a complete interactive installation, including the MariaDB restore,
-Python virtual environment, credentials, and the optional timer setup, use
+Python virtual environment, credentials, and timer setup, use
 [`install.sh`](../install.sh) from the project root. This document describes
 the systemd-specific installer and service behavior. The installer always
-enables the dashboard web service; periodic monitoring and positions-import
-timers are optional.
+enables the dashboard web service. A full installation also enables the
+periodic monitoring, positions-import, and database-backup timers.
 
 The dashboard service runs Uvicorn on `127.0.0.1:8000` and restarts it if it
 exits. It is reachable locally on the server. It is not exposed directly to
@@ -28,6 +28,9 @@ configured source tables.
 - The root and per-script `.env` files contain database credentials and
   required RPC/API configuration. Keep them private; credentials are
   deliberately not copied into the systemd units.
+- `backup/.env` contains the database and FTP settings for the daily backup.
+  The backup service requires `mariadb-dump` and `curl`; its local SQL files
+  are written to `backup/` with private permissions.
 - The dashboard's on-demand portfolio summary also needs CoinTracking API
   credentials named `ct_key` and `ct_secret` in `.env`. It reads balances only
   when the summary is opened and caches them for one hour.
@@ -51,8 +54,8 @@ configured source tables.
 
 The project-root `install-systemd.sh` renders the unit templates using the
 current project path and service user, installs and starts
-`lp-dashboard-web.service`, installs the Notify and positions services and
-timers, and enables the timers. Run it from the deployed checkout:
+`lp-dashboard-web.service`, installs the Notify, positions, and database
+backup services and timers, and enables the timers. Run it from the deployed checkout:
 
 ```sh
 sudo ./install-systemd.sh
@@ -75,10 +78,11 @@ LP_DASHBOARD_USER=your_linux_user ./install-systemd.sh
 Replace `your_linux_user` with the account that owns or can read the project.
 
 The installer expects `.venv/bin/python` and `.venv/bin/uvicorn` to exist.
-Configure the per-script `.env`, `telegram.conf`, and `positions` files before
-the timers run. Service output is sent to journald rather than written to
-cron-style log files. The positions service and timer are installed and
-enabled along with the Notify timers when using the full installer.
+Configure the per-script `.env`, `backup/.env`, `telegram.conf`, and
+`positions` files before the timers run. Service output is sent to journald
+rather than written to cron-style log files. The positions and database
+backup services and timers are installed and enabled along with the Notify
+timers when using the full installer.
 
 Optionally check the database/API setup without writing position rows:
 
@@ -112,6 +116,9 @@ sudo journalctl -u lp-dashboard-web.service --since today
 systemctl status lp-dashboard-positions.timer
 systemctl list-timers lp-dashboard-positions.timer
 sudo journalctl -u lp-dashboard-positions.service --since today
+systemctl status lp-dashboard-backup.timer
+systemctl list-timers lp-dashboard-backup.timer
+sudo journalctl -u lp-dashboard-backup.service --since today
 systemctl list-timers 'lp-dashboard-notify-*'
 sudo journalctl -u lp-dashboard-notify-uniswap-arbitrum.service --since today
 ```
@@ -124,6 +131,12 @@ To disable the periodic checks:
 
 ```sh
 sudo systemctl disable --now lp-dashboard-positions.timer
+```
+
+To disable the daily database backup:
+
+```sh
+sudo systemctl disable --now lp-dashboard-backup.timer
 ```
 
 To stop the dashboard service:
