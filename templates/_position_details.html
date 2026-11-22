@@ -173,7 +173,9 @@
         <section>
             <h3 class="mb-2 font-semibold text-gray-100">Kursverlauf der letzten 24 Stunden</h3>
             <p class="mb-2 text-xs text-gray-400">
-                {{ details.tokens[1].symbol }} pro {{ details.tokens[0].symbol }}
+                <span data-price-chart-pair>
+                    {{ details.tokens[1].symbol }} pro {{ details.tokens[0].symbol }}
+                </span>
             </p>
             {% if chart_data.prices.labels %}
             <div class="h-64">

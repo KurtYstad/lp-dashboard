@@ -159,7 +159,28 @@
         pair.textContent = inverted
             ? `${pair.dataset.baseSymbol} pro ${pair.dataset.quoteSymbol}`
             : `${pair.dataset.quoteSymbol} pro ${pair.dataset.baseSymbol}`;
+        const details = range.closest("[data-live-position-details]");
+        const chartPair = details.querySelector("[data-price-chart-pair]");
+        if (chartPair) {
+            chartPair.textContent = pair.textContent;
+        }
         range.dataset.inverted = String(inverted);
+
+        const priceCanvas = details.querySelector("#position-price-chart");
+        const chart = window.Chart?.getChart(priceCanvas);
+        const chartDataElement = details.querySelector("#position-chart-data");
+        if (chart && chartDataElement) {
+            const { labels, values, lower: chartLower, upper: chartUpper } =
+                JSON.parse(chartDataElement.textContent).prices;
+            const shownChartLower = inverted ? 1 / chartUpper : chartLower;
+            const shownChartUpper = inverted ? 1 / chartLower : chartUpper;
+            chart.data.datasets[0].data = values.map((value) =>
+                inverted ? 1 / value : value,
+            );
+            chart.data.datasets[1].data = labels.map(() => shownChartLower);
+            chart.data.datasets[2].data = labels.map(() => shownChartUpper);
+            chart.update();
+        }
     };
 
     (() => {

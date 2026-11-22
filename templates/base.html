@@ -37,7 +37,11 @@
                                             borderColor: (context) => {
                                                 const midpoint =
                                                     (context.p0.parsed.y + context.p1.parsed.y) / 2;
-                                                return midpoint >= lower && midpoint <= upper
+                                                const currentLower =
+                                                    context.chart.data.datasets[1].data[0];
+                                                const currentUpper =
+                                                    context.chart.data.datasets[2].data[0];
+                                                return midpoint >= currentLower && midpoint <= currentUpper
                                                     ? "#34d399"
                                                     : "#f87171";
                                             },
