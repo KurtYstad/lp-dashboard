@@ -1,15 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import asyncio
 import logging
+import sys
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from typing import Literal, TypedDict
+from urllib.parse import urlsplit
 
 import pandas as pd
 from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -24,6 +27,7 @@ from database import (
     get_position_detail_snapshot,
     get_position_hourly_fees,
     get_position_price_history,
+    get_position_snapshot_count,
     get_recent_position_sources,
 )
 from number_formatting import format_de_number
@@ -31,12 +35,45 @@ from pricing import get_eur_usd_rate, get_token_usd_price, normalize_chain
 from position_details import (
     ClosedPositionError,
     UnsupportedPositionError,
+    _base58_decode,
     get_position_details,
 )
 
 logger = logging.getLogger(__name__)
 
 APP_DIRECTORY = Path(__file__).resolve().parent
+POSITION_NOTIFY_CONFIGS = {
+    "uniswap_ethereum": (
+        "Uniswap (Ethereum)",
+        "ethereum",
+        "notify/uniswap/ethereum/uniswap.py",
+    ),
+    "uniswap_arbitrum": (
+        "Uniswap (Arbitrum)",
+        "arbitrum",
+        "notify/uniswap/arbitrum/uniswap.py",
+    ),
+    "uniswap_polygon": (
+        "Uniswap (Polygon)",
+        "polygon",
+        "notify/uniswap/polygon/uniswap.py",
+    ),
+    "uniswap_base": (
+        "Uniswap (Base)",
+        "base",
+        "notify/uniswap/base/uniswap.py",
+    ),
+    "uniswap_robinhood": (
+        "Uniswap (Robinhood)",
+        "robinhood",
+        "notify/uniswap/robinhood/uniswap.py",
+    ),
+    "aero": ("Aerodrome (Base)", "aero", "notify/aero/aero.py"),
+    "cake": ("PancakeSwap (BNB Chain)", "cake", "notify/pancakeswap/cake.py"),
+    "orca": ("Orca (Solana)", "orca", "notify/orca/orca.py"),
+    "raydium": ("Raydium (Solana)", "raydium", "notify/raydium/raydium.py"),
+}
+POSITION_NOTIFY_TIMEOUT_SECONDS = 300
 app = FastAPI()
 app.mount(
     "/icons",
@@ -195,7 +232,324 @@ def read_root(request: Request):
             "tokens": tokens,
             "position_ids": position_ids,
             "filter_error": filter_error,
+            "position_notifiers": [
+                {
+                    "key": key,
+                    "label": config[0],
+                    "is_uniswap": key.startswith("uniswap_"),
+                }
+                for key, config in POSITION_NOTIFY_CONFIGS.items()
+            ],
         },
+    )
+
+
+def _position_id_error(protocol: str, position_id: str) -> str | None:
+    if protocol.startswith("uniswap_") or protocol in {"aero", "cake"}:
+        if not position_id.isascii() or not position_id.isdigit():
+            return "Die Positions-ID muss eine positive Zahl sein."
+        if len(position_id) > 78:
+            return "Die Positions-ID liegt außerhalb des gültigen Bereichs."
+        if not 0 < int(position_id) < 2**256:
+            return "Die Positions-ID liegt außerhalb des gültigen Bereichs."
+        return None
+
+    if protocol == "orca" and len(position_id) != 44:
+        return "Orca-Positionsadressen müssen 44 Zeichen lang sein."
+    if protocol == "raydium" and len(position_id) not in {43, 44}:
+        return "Raydium-Positionsadressen müssen 43 oder 44 Zeichen lang sein."
+    try:
+        decoded_position_id = _base58_decode(position_id)
+    except ValueError:
+        return "Die Positions-ID ist keine gültige Base58-Adresse."
+    if len(decoded_position_id) != 32:
+        return "Die Positions-ID muss eine gültige 32-Byte-Adresse sein."
+    return None
+
+
+def _request_has_same_origin(request: Request) -> bool:
+    origin = request.headers.get("origin") or request.headers.get("referer")
+    if not origin:
+        return False
+
+    origin_parts = urlsplit(origin)
+    expected_host = (
+        request.headers.get("x-forwarded-host")
+        or request.headers.get("host")
+        or request.url.netloc
+    )
+    expected_scheme = (
+        request.headers.get("x-forwarded-proto") or request.url.scheme
+    ).split(",")[0].strip()
+    return (
+        origin_parts.scheme == expected_scheme
+        and origin_parts.netloc.casefold() == expected_host.casefold()
+    )
+
+
+def _append_position_entry(
+    positions_file: Path,
+    position_id: str,
+    version: str | None,
+    is_uniswap: bool,
+) -> bool:
+    entry_to_add = f"{version}:{position_id}" if is_uniswap and version else position_id
+    with positions_file.open("a+", encoding="utf-8", newline="") as file:
+        file.seek(0)
+        lines = file.readlines()
+        unversioned_matches = []
+        has_same_version = False
+
+        for index, line in enumerate(lines):
+            existing_entry = line.strip()
+            if not existing_entry or existing_entry.startswith("#"):
+                continue
+            existing_version, separator, existing_id = existing_entry.partition(":")
+            if not separator:
+                existing_version = None
+                existing_id = existing_entry
+            else:
+                existing_version = existing_version.strip().lower()
+                existing_id = existing_id.strip()
+
+            if existing_id != position_id:
+                continue
+            if not is_uniswap:
+                return False
+            if existing_version is None:
+                unversioned_matches.append(index)
+            elif existing_version == version:
+                has_same_version = True
+            elif version is None:
+                return False
+
+        if unversioned_matches and version is not None:
+            for index in unversioned_matches:
+                line_ending = (
+                    "\r\n"
+                    if lines[index].endswith("\r\n")
+                    else "\n"
+                    if lines[index].endswith("\n")
+                    else "\r"
+                    if lines[index].endswith("\r")
+                    else ""
+                )
+                lines[index] = f"{version}:{position_id}{line_ending}"
+            file.seek(0)
+            file.truncate()
+            file.writelines(lines)
+            file.flush()
+            return True
+        if unversioned_matches or has_same_version:
+            return False
+
+        file.seek(0, 2)
+        if lines and not lines[-1].endswith(("\n", "\r")):
+            file.write("\n")
+        file.write(f"{entry_to_add}\n")
+        file.flush()
+    return True
+
+
+async def _run_position_notifier(
+    script: Path,
+    position_id: str,
+    version: str | None,
+) -> tuple[int | None, bool]:
+    command = [sys.executable, str(script), position_id]
+    if version is not None:
+        command.append(version)
+
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        cwd=str(script.parent),
+    )
+    try:
+        return_code = await asyncio.wait_for(
+            process.wait(),
+            timeout=POSITION_NOTIFY_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        await process.wait()
+        return None, True
+    except asyncio.CancelledError:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        await process.wait()
+        raise
+    return return_code, False
+
+
+@app.post("/add-position", name="add_position")
+async def add_position(
+    request: Request,
+    protocol: str = Form(...),
+    position_id: str = Form(...),
+    version: str = Form(""),
+):
+    if not _request_has_same_origin(request):
+        return JSONResponse(
+            {"detail": "Ungültige Anfragequelle."},
+            status_code=403,
+        )
+
+    config = POSITION_NOTIFY_CONFIGS.get(protocol)
+    if config is None:
+        return JSONResponse(
+            {"detail": "Dieses Protokoll wird nicht unterstützt."},
+            status_code=400,
+        )
+
+    position_id = position_id.strip()
+    version = version.strip().lower() or None
+    is_uniswap = protocol.startswith("uniswap_")
+    if version is not None and (not is_uniswap or version not in {"v3", "v4"}):
+        return JSONResponse(
+            {"detail": "Die Protokollversion muss v3 oder v4 sein."},
+            status_code=400,
+        )
+
+    id_error = _position_id_error(protocol, position_id)
+    if id_error:
+        return JSONResponse({"detail": id_error}, status_code=400)
+
+    try:
+        existing_snapshot_count = await asyncio.to_thread(
+            get_position_snapshot_count,
+            config[1],
+            position_id,
+        )
+    except Exception:
+        logger.exception(
+            "Could not verify the position snapshot table for %s",
+            protocol,
+        )
+        return JSONResponse(
+            {"detail": "Die Datenbank konnte nicht geprüft werden."},
+            status_code=503,
+        )
+
+    script = APP_DIRECTORY / config[2]
+    positions_file = script.parent / "positions"
+    try:
+        was_added = _append_position_entry(
+            positions_file,
+            position_id,
+            version,
+            is_uniswap,
+        )
+    except OSError:
+        logger.exception("Could not update positions file %s", positions_file)
+        return JSONResponse(
+            {"detail": "Die Datei positions konnte nicht aktualisiert werden."},
+            status_code=500,
+        )
+
+    if was_added:
+        logger.info("Added %s position %s to %s", protocol, position_id, positions_file)
+    else:
+        logger.info(
+            "Position %s is already listed in %s; rerunning its notifier",
+            position_id,
+            positions_file,
+        )
+    try:
+        return_code, timed_out = await _run_position_notifier(
+            script,
+            position_id,
+            version if is_uniswap else None,
+        )
+    except OSError:
+        logger.exception("Could not start position notifier %s", script)
+        return JSONResponse(
+            {
+                "detail": (
+                    "Der Eintrag in positions bleibt bestehen, aber das "
+                    "Notify-Skript konnte nicht gestartet werden."
+                )
+            },
+            status_code=500,
+        )
+
+    if timed_out:
+        logger.error("Position notifier timed out: %s", script)
+        return JSONResponse(
+            {
+                "detail": (
+                    "Der Eintrag in positions bleibt bestehen, aber die "
+                    "erste Abfrage hat das Zeitlimit überschritten."
+                )
+            },
+            status_code=504,
+        )
+    if return_code != 0:
+        logger.error(
+            "Position notifier failed for %s/%s with exit code %s",
+            protocol,
+            position_id,
+            return_code,
+        )
+        return JSONResponse(
+            {
+                "detail": (
+                    "Der Eintrag in positions bleibt bestehen, aber die "
+                    f"Abfrage ist mit Exit-Code {return_code} fehlgeschlagen."
+                )
+            },
+            status_code=502,
+        )
+
+    try:
+        new_snapshot_count = await asyncio.to_thread(
+            get_position_snapshot_count,
+            config[1],
+            position_id,
+        )
+    except Exception:
+        logger.exception(
+            "Could not verify the initial snapshot for %s/%s",
+            protocol,
+            position_id,
+        )
+        return JSONResponse(
+            {
+                "detail": (
+                    "Das Notify-Skript wurde ausgeführt, der Datenbankeintrag "
+                    "konnte aber nicht verifiziert werden."
+                )
+            },
+            status_code=503,
+        )
+    if new_snapshot_count <= existing_snapshot_count:
+        logger.error(
+            "Position notifier produced no snapshot for %s/%s",
+            protocol,
+            position_id,
+        )
+        return JSONResponse(
+            {
+                "detail": (
+                    "Der Eintrag in positions bleibt bestehen, aber es wurde "
+                    "kein neuer Datenbankeintrag angelegt."
+                )
+            },
+            status_code=502,
+        )
+
+    return JSONResponse(
+        {
+            "message": (
+                "Position eingetragen und erste Abfrage abgeschlossen."
+                if was_added
+                else "Position war bereits eingetragen; Abfrage erneut abgeschlossen."
+            )
+        }
     )
 
 

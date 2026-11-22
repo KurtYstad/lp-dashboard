@@ -275,6 +275,29 @@ def get_position_detail_snapshot(table: str, position_id: str) -> dict[str, obje
     }
 
 
+def get_position_snapshot_count(table: str, position_id: str) -> int:
+    if table not in PENDING_FEE_TABLES:
+        raise ValueError(f"Unbekannte Positionstabelle: {table}")
+
+    connection = _connect()
+    try:
+        cursor = connection.cursor()
+        try:
+            cursor.execute(
+                f"SELECT COUNT(*) FROM `{table}` WHERE id = ?",
+                (position_id,),
+            )
+            row = cursor.fetchone()
+        finally:
+            cursor.close()
+    finally:
+        connection.close()
+
+    if row is None:
+        raise RuntimeError("Die Datenbank hat keine Snapshot-Anzahl zurückgegeben.")
+    return int(row[0])
+
+
 def get_position_price_history(
     table: str,
     position_id: str,

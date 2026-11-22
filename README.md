@@ -110,6 +110,12 @@ Vor der Aktivierung:
 
 ## Dashboard
 
+Über **Neue Position** oben rechts lassen sich Positionen für die unterstützten
+Notify-Skripte hinzufügen. Nach Protokoll- und ID-Auswahl (bei Uniswap optional
+mit `v3` oder `v4`) ergänzt das Dashboard die jeweilige `positions`-Datei und
+führt das zugehörige Notify-Skript für diese Position aus. Der neue Snapshot
+wird vor Abschluss in der Datenbank verifiziert.
+
 ### Erträge filtern und auswerten
 
 Die Ertragshistorie wird aus den in der Datenbank erfassten Fee-Einträgen
