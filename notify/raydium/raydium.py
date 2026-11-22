@@ -6,6 +6,7 @@
 import asyncio
 import base64
 import datetime
+import argparse
 import hashlib
 import io
 import os
@@ -23,7 +24,24 @@ from solana.rpc.async_api import AsyncClient
 from solders.pubkey import Pubkey
 
 
+def parse_position_id(value: str) -> str:
+    try:
+        Pubkey.from_string(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"Invalid Raydium position ID: {error}") from error
+    return value
+
+
 dotenv.load_dotenv()
+
+parser = argparse.ArgumentParser(description="Raydium fee monitor")
+parser.add_argument(
+    "position_id",
+    nargs="?",
+    type=parse_position_id,
+    help="Process only this position ID.",
+)
+args = parser.parse_args()
 
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -226,6 +244,32 @@ def read_position_ids(filename: str = "positions") -> list[str]:
             except Exception as error:
                 print(f"Skipping invalid Solana address in {filename}:{line_no}: {error}")
     return position_ids
+
+
+def remove_position_id(position_id: str, filename: str = "positions") -> bool:
+    try:
+        with open(filename, "r", encoding="utf-8", newline="") as file:
+            lines = file.readlines()
+    except FileNotFoundError:
+        return False
+
+    remaining = []
+    removed = False
+    for line in lines:
+        entry = line.strip()
+        if not entry or entry.startswith("#"):
+            remaining.append(line)
+            continue
+
+        if entry == position_id:
+            removed = True
+        else:
+            remaining.append(line)
+
+    if removed:
+        with open(filename, "w", encoding="utf-8", newline="") as file:
+            file.writelines(remaining)
+    return removed
 
 
 def db_connect():
@@ -639,7 +683,11 @@ async def read_position_limited(
 
 
 async def main() -> None:
-    position_ids = read_position_ids()
+    position_ids = (
+        [args.position_id]
+        if args.position_id is not None
+        else read_position_ids()
+    )
     if not position_ids:
         return
     solana_client = SolanaClient(SOLANA_RPC)
@@ -671,6 +719,12 @@ async def main() -> None:
                     connection.rollback()
                     print(f"##### {timestamp} #####\nPosition {snapshot.pos_id[:8]}...: {error}")
                     continue
+
+                if snapshot.liquidity == 0 and remove_position_id(pos_id):
+                    print(
+                        f"Removed {pos_id} from positions "
+                        "(liquidity is zero)."
+                    )
 
                 if summary is not None:
                     try:

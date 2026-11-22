@@ -9,6 +9,7 @@ Tracks unclaimed fees and sends Telegram notifications
 
 import io
 import os
+import argparse
 import datetime
 import telegram_send
 import mariadb
@@ -26,11 +27,30 @@ from solders.pubkey import Pubkey
 import base64
 
 
+def parse_position_id(value: str) -> str:
+    if len(value) != 44:
+        raise argparse.ArgumentTypeError("Orca position IDs must be 44 characters long.")
+    try:
+        Pubkey.from_string(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"Invalid Orca position ID: {error}") from error
+    return value
+
+
 # ============================================================
 # CONFIG
 # ============================================================
 
 dotenv.load_dotenv()
+
+parser = argparse.ArgumentParser(description="Orca fee monitor")
+parser.add_argument(
+    "position_id",
+    nargs="?",
+    type=parse_position_id,
+    help="Process only this position ID.",
+)
+args = parser.parse_args()
 
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -281,6 +301,32 @@ def db_connect():
         raise RuntimeError(f"Error connecting to MariaDB: {exc}") from exc
 
     return connection, connection.cursor()
+
+
+def remove_position_id(position_id: str, filename: str = "positions") -> bool:
+    try:
+        with open(filename, "r", encoding="utf-8", newline="") as file:
+            lines = file.readlines()
+    except FileNotFoundError:
+        return False
+
+    remaining = []
+    removed = False
+    for line in lines:
+        entry = line.strip()
+        if not entry or entry.startswith("#"):
+            remaining.append(line)
+            continue
+
+        if entry == position_id:
+            removed = True
+        else:
+            remaining.append(line)
+
+    if removed:
+        with open(filename, "w", encoding="utf-8", newline="") as file:
+            file.writelines(remaining)
+    return removed
 
 
 def insert_snapshot(cursor, snapshot: PositionSnapshot, timestamp: str):
@@ -995,7 +1041,11 @@ async def read_position_limited(
 # ============================================================
 
 async def main():
-    position_ids = read_position_ids()
+    position_ids = (
+        [args.position_id]
+        if args.position_id is not None
+        else read_position_ids()
+    )
     if not position_ids:
         return
 
@@ -1047,6 +1097,12 @@ async def main():
                     print(f"##### {timestamp} #####")
                     print(f"Position {snapshot.pos_id[:8]}...: {error}")
                     continue
+
+                if snapshot.liquidity == 0 and remove_position_id(pos_id):
+                    print(
+                        f"Removed {pos_id} from positions "
+                        "(liquidity is zero)."
+                    )
 
                 if summary is None:
                     continue

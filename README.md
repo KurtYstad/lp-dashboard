@@ -225,6 +225,23 @@ gesendet werden.
 | `notify/orca/orca.py` | Orca Whirlpools auf Solana | Positionskurs, Range, Fees und Verlauf |
 | `notify/raydium/raydium.py` | Raydium CLMM auf Solana | Positionskurs, Range, Fees und Verlauf |
 
+Alle neun Skripte können optional auf eine einzelne Position beschränkt werden,
+indem ihre ID als erstes Argument übergeben wird. Uniswap akzeptiert zusätzlich
+die Protokollversion `v3` oder `v4` als zweites Argument:
+
+```bash
+python notify/uniswap/ethereum/uniswap.py 12345 v3
+python notify/uniswap/ethereum/uniswap.py 12345
+python notify/orca/orca.py <positionsadresse>
+```
+
+Ohne ID werden weiterhin die Positionen aus `positions` verarbeitet. Bei
+Uniswap übernimmt eine ID ohne angegebene Version die Version aus `positions`,
+falls dort eindeutig hinterlegt; andernfalls wird die Version automatisch
+ermittelt. Die Version kann nur zusammen mit einer ID angegeben werden.
+Nach erfolgreicher Abfrage und Speicherung wird eine Position mit Liquidität
+`0` automatisch aus der jeweiligen Datei `positions` entfernt.
+
 ### Zusammenfassende Ertragsberichte
 
 Die Skripte unter `notify/uniswap/total/` erstellen netzwerkübergreifende

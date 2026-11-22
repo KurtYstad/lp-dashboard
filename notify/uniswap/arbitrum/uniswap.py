@@ -35,6 +35,18 @@ parser.add_argument(
     choices=["arbitrum", "ethereum", "polygon", "optimism", "base"],
     help="Blockchain to use. Overrides the CHAIN environment variable.",
 )
+parser.add_argument(
+    "position_id",
+    nargs="?",
+    type=int,
+    help="Process only this position ID.",
+)
+parser.add_argument(
+    "version",
+    nargs="?",
+    choices=["v3", "v4"],
+    help="Uniswap protocol version for the position ID.",
+)
 args = parser.parse_args()
 
 DB_USER = os.getenv("DB_USER")
@@ -404,6 +416,7 @@ class PositionSnapshot:
     price_upper: Decimal
     current_price: Decimal
     fee: int
+    liquidity: int
     total_unclaimed_usd_value: Decimal
     in_range: int
     valuation_source: str
@@ -631,6 +644,49 @@ def read_position_ids(filename="positions") -> list[tuple[str | None, int]]:
                 print(f"Skipping invalid position id in {filename}:{line_no}: {line}")
 
     return position_ids
+
+
+def remove_position_id(
+    position_id: int,
+    version: str | None,
+    filename: str = "positions",
+) -> bool:
+    try:
+        with open(filename, "r", encoding="utf-8", newline="") as file:
+            lines = file.readlines()
+    except FileNotFoundError:
+        return False
+
+    remaining = []
+    removed = False
+    for line in lines:
+        entry = line.strip()
+        if not entry or entry.startswith("#"):
+            remaining.append(line)
+            continue
+
+        entry_version, separator, entry_id = entry.partition(":")
+        if separator:
+            entry_version = entry_version.strip().lower()
+            entry_id = entry_id.strip()
+        else:
+            entry_version = None
+            entry_id = entry
+
+        try:
+            matches_id = int(entry_id) == position_id
+        except ValueError:
+            matches_id = False
+
+        if matches_id and entry_version == version:
+            removed = True
+        else:
+            remaining.append(line)
+
+    if removed:
+        with open(filename, "w", encoding="utf-8", newline="") as file:
+            file.writelines(remaining)
+    return removed
 
 
 def insert_snapshot(cursor, snapshot: PositionSnapshot, timestamp: str):
@@ -977,6 +1033,7 @@ async def read_v3_position(token_id: int, eth_usd: Decimal) -> PositionSnapshot:
         price_upper=price_upper,
         current_price=token1_per_token0,
         fee=fee,
+        liquidity=liquidity,
         total_unclaimed_usd_value=total_unclaimed_usd_value,
         in_range=int(in_range),
         valuation_source=valuation_source,
@@ -1085,6 +1142,7 @@ async def read_v4_position(token_id: int, eth_usd: Decimal) -> PositionSnapshot:
         price_upper=price_upper,
         current_price=token1_per_token0,
         fee=fee,
+        liquidity=liquidity,
         total_unclaimed_usd_value=total_unclaimed_usd_value,
         in_range=int(in_range),
         valuation_source=valuation_source,
@@ -1116,7 +1174,23 @@ async def read_position_limited(
 
 
 async def main():
-    position_ids = read_position_ids()
+    if args.position_id is None:
+        position_ids = read_position_ids()
+    else:
+        version = args.version
+        if version is None:
+            try:
+                configured_positions = read_position_ids()
+            except FileNotFoundError:
+                configured_positions = []
+            configured_versions = {
+                file_version
+                for file_version, pos_id in configured_positions
+                if pos_id == args.position_id
+            }
+            if len(configured_versions) == 1:
+                version = configured_versions.pop()
+        position_ids = [(version, args.position_id)]
     if not position_ids:
         print("No positions found.")
         return
@@ -1165,6 +1239,12 @@ async def main():
                 print(f"##### {timestamp} #####")
                 print(f"Position {snapshot.pos_id}: {error}")
                 continue
+
+            if snapshot.liquidity == 0 and remove_position_id(pos_id, version):
+                print(
+                    f"Removed {position_label}{pos_id} from positions "
+                    "(liquidity is zero)."
+                )
 
             if summary is None:
                 continue

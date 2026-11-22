@@ -4,6 +4,7 @@
 import os
 import sys
 import json
+import argparse
 import datetime
 import asyncio
 import io
@@ -20,6 +21,15 @@ import numpy as np
 # ============================================================
 
 dotenv.load_dotenv()
+
+parser = argparse.ArgumentParser(description="PancakeSwap fee monitor")
+parser.add_argument(
+    "position_id",
+    nargs="?",
+    type=int,
+    help="Process only this position ID.",
+)
+args = parser.parse_args()
 
 RPC_URL = os.getenv("BSC_RPC_URL", "https://bsc-dataseed.binance.org/")
 
@@ -454,6 +464,37 @@ def db_connect():
     except mariadb.Error as exc:
         raise RuntimeError(f"Error connecting to MariaDB: {exc}") from exc
     return connection, connection.cursor()
+
+
+def remove_position_id(position_id: int, filename: str = "positions") -> bool:
+    try:
+        with open(filename, "r", encoding="utf-8", newline="") as file:
+            lines = file.readlines()
+    except FileNotFoundError:
+        return False
+
+    remaining = []
+    removed = False
+    for line in lines:
+        entry = line.strip()
+        if not entry:
+            remaining.append(line)
+            continue
+
+        try:
+            matches_id = int(entry) == position_id
+        except ValueError:
+            matches_id = False
+
+        if matches_id:
+            removed = True
+        else:
+            remaining.append(line)
+
+    if removed:
+        with open(filename, "w", encoding="utf-8", newline="") as file:
+            file.writelines(remaining)
+    return removed
 
 
 def insert_snapshot(cursor, pos_id: int, timestamp: str, token0: str, token1: str,
@@ -951,6 +992,9 @@ def process_position(pos_id: int, w3, position_mgr, factory, master, bnb_usd, po
                 insert_into_total_table(cursor, pos_id, timestamp, Web3.to_checksum_address(CAKE), get_token_symbol(w3, Web3.to_checksum_address(CAKE)), cake_reward_display, "bsc")
         
         connection.commit()
+
+        if liquidity == 0 and remove_position_id(pos_id):
+            print(f"Removed {pos_id} from positions (liquidity is zero).")
         
         # Calculate fee summary from 24h history and send Telegram report
         cake_decimals = get_token_decimals(w3, Web3.to_checksum_address(CAKE))
@@ -988,7 +1032,11 @@ def main():
     bnb_usd = get_bnb_usd_price(w3)
 
     # Read all position IDs from file
-    position_ids = read_position_ids()
+    position_ids = (
+        [args.position_id]
+        if args.position_id is not None
+        else read_position_ids()
+    )
     
     if not position_ids:
         print("✗ No positions found in positions file")
