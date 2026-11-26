@@ -165,7 +165,7 @@
                         Aktualisieren
                     </button>
                     <button type="button"
-                            onclick="this.form.reset(); htmx.trigger(this.form, 'submit')"
+                            onclick="this.form.reset(); this.form.querySelector('select[name=position_id]').value = ''; htmx.trigger(this.form, 'submit')"
                             class="rounded bg-gray-600 px-6 py-3 font-semibold text-white transition hover:bg-gray-500">
                         Filter zurücksetzen
                     </button>
