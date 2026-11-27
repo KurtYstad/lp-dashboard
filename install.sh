@@ -72,7 +72,7 @@ install_os_packages() {
     local -a packages
 
     if command -v apt-get >/dev/null 2>&1; then
-        packages=(mariadb-client build-essential pkg-config libmariadb-dev python3-venv)
+        packages=(mariadb-client build-essential pkg-config libmariadb-dev python3-dev python3-venv)
         if [[ "$include_server" == "yes" ]]; then
             packages+=(mariadb-server)
         fi

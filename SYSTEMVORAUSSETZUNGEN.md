@@ -35,7 +35,8 @@ Das Script installiert unter anderem `uvicorn[standard]`, `fastapi`,
 `httpx`, `eth-abi`, `eth-utils`, `python-telegram-bot<14`, `telegram-send`,
 `matplotlib`, `numpy`, `solana` und `solders`. Systemseitige Build-Werkzeuge und
 MariaDB-Connector-Bibliotheken werden bei unterstützten Paketmanagern ebenfalls
-installiert.
+installiert. Dazu gehören die Python-Entwicklungsheader, die zum Kompilieren
+des MariaDB-Python-Treibers benötigt werden.
 
 ## Datenbankzugang
 
