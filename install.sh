@@ -328,8 +328,22 @@ def write_config(template_name, destination_name, fields, file_format):
     if destination.exists():
         print(f"Vorhandene Datei bleibt unverändert: {destination_name}")
         destination.chmod(0o600)
+        content = destination.read_text(encoding="utf-8")
+        if file_format == "telegram":
+            sections = [
+                line.strip()
+                for line in content.splitlines()
+                if line.strip().startswith("[") and line.strip().endswith("]")
+            ]
+            if "[telegram]" not in sections:
+                if sections:
+                    raise SystemExit(
+                        f"{destination_name} enthält keinen [telegram]-Abschnitt."
+                    )
+                content = "[telegram]\n" + content
+                destination.write_text(content, encoding="utf-8")
         values = {}
-        for line in destination.read_text(encoding="utf-8").splitlines():
+        for line in content.splitlines():
             key, separator, value = line.partition("=")
             if separator:
                 values[key] = value.strip().strip("'\"")
@@ -577,8 +591,7 @@ fi
     httpx \
     eth-abi \
     eth-utils \
-    "python-telegram-bot<14" \
-    telegram-send \
+    "telegram-send>=0.39.2" \
     matplotlib \
     numpy \
     solana \

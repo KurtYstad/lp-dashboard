@@ -166,6 +166,15 @@ if [[ "$INSTALL_MODE" == "dashboard-only" ]]; then
     exit 0
 fi
 
+SERVICE_GROUP="$(id -gn "$SERVICE_USER")"
+for script in "${NOTIFY_SCRIPTS[@]}"; do
+    position_file="$PROJECT_DIR/${script%/*}/positions"
+    if [[ ! -e "$position_file" && ! -L "$position_file" ]]; then
+        install -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0600 \
+            /dev/null "$position_file"
+    fi
+done
+
 for unit in "${NOTIFY_UNITS[@]}"; do
     install_unit "$unit.service"
     install_unit "$unit.timer"

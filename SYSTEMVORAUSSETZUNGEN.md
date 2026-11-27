@@ -32,8 +32,8 @@ gehen.
 
 Das Script installiert unter anderem `uvicorn[standard]`, `fastapi`,
 `python-multipart`, `jinja2`, `pandas`, `mariadb`, `python-dotenv`, `web3`,
-`httpx`, `eth-abi`, `eth-utils`, `python-telegram-bot<14`, `telegram-send`,
-`matplotlib`, `numpy`, `solana` und `solders`. Systemseitige Build-Werkzeuge und
+`httpx`, `eth-abi`, `eth-utils`, `telegram-send>=0.39.2`, `matplotlib`,
+`numpy`, `solana` und `solders`. Systemseitige Build-Werkzeuge und
 MariaDB-Connector-Bibliotheken werden bei unterstützten Paketmanagern ebenfalls
 installiert. Dazu gehören die Python-Entwicklungsheader, die zum Kompilieren
 des MariaDB-Python-Treibers benötigt werden.
@@ -105,6 +105,10 @@ Der Installer fragt folgende Werte ab:
 - `token`: Bot-Token von BotFather
 - `chat_id`: ID des privaten Chats oder der Gruppe, an die Berichte gesendet
   werden sollen
+
+Die Dateien verwenden das INI-Format von `telegram-send` mit dem Abschnitt
+`[telegram]`. Der Installer ergänzt diesen Abschnitt bei vorhandenen
+Konfigurationen ohne Abschnitt automatisch.
 
 Ein gemeinsamer Bot und Ziel-Chat werden in die Root-Konfiguration und in die
 `telegram.conf`-Dateien der Notify-Verzeichnisse übernommen. Die

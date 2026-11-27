@@ -1,2 +1,3 @@
+[telegram]
 token=replace_with_telegram_bot_token
 chat_id=replace_with_telegram_chat_id

@@ -61,9 +61,13 @@ Eingabe ausgelassen werden; fehlende Werte werden am Ende mit dem Pfad der
 jeweiligen Konfigurationsdatei aufgeführt. Die privaten Dateien werden aus den
 Beispielen erstellt:
 `.env` und `telegram.conf` im Projekt-Root sowie `.env` und `telegram.conf` in
-den jeweiligen Notify-Verzeichnissen. Die Root-Telegram-Konfiguration wird für
-Positionsimport-Meldungen verwendet. Ein gemeinsamer Telegram-Bot und Chat
-werden für alle Skripte verwendet.
+den jeweiligen Notify-Verzeichnissen. Standardmäßig wird der bei der
+Installation angegebene Telegram-Bot samt Ziel an alle Notify-Instanzen
+übernommen. Für jedes Protokoll und jede Blockchain kann ein separates
+Telegram-Ziel verwendet werden: Passe dafür `chat_id` in der jeweiligen
+`notify/.../telegram.conf` an, zum Beispiel in
+`notify/uniswap/arbitrum/telegram.conf`. Die Root-Telegram-Konfiguration wird
+weiterhin für Positionsimport-Meldungen verwendet.
 
 Die Monitoring- und Positionsimport-Timer werden nur auf Wunsch aktiviert und
 wenn die erforderlichen Zugangsdaten vollständig sind. CoinTracking-Zugangsdaten
@@ -84,7 +88,20 @@ Vor der Aktivierung:
    TLS-Zertifikat bereit. Ersetze in der Konfiguration `lp.example.com` und
    die Zertifikatspfade durch deine Werte. Das Beispiel erwartet ein
    Let's Encrypt-Zertifikat sowie
-   `/etc/letsencrypt/options-ssl-apache.conf`.
+   `/etc/letsencrypt/options-ssl-apache.conf`. Auf Debian/Ubuntu kannst du
+   Certbot samt Apache-Plugin installieren und das Zertifikat ausstellen
+   lassen:
+
+   ```sh
+   sudo apt install certbot python3-certbot-apache
+   sudo certbot --apache -d lp.example.com
+   ```
+
+   Certbot richtet dabei auch eine Apache-Site ein. Wenn du stattdessen die
+   mitgelieferte `apache-lp-dashboard.conf` verwendest, achte darauf, dass
+   keine zweite aktive HTTPS-Site denselben `ServerName` beansprucht. Fehlt
+   `options-ssl-apache.conf`, prüfe die Certbot-Apache-Installation; die
+   `Include`-Zeile muss auf eine vorhandene TLS-Konfigurationsdatei zeigen.
 2. Aktiviere die benötigten Apache-Module und erstelle eine Passwortdatei:
 
    ```sh

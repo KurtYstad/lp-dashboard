@@ -36,8 +36,9 @@ configured source tables.
   when the summary is opened and caches them for one hour.
 - Trust Wallet logos are cached only for coins present in the portfolio, rather
   than copying the full asset repository; Ethereum symbols take priority.
-- Each `telegram.conf` is in the `telegram-send` configuration format. Keep
-  these files private; secret configuration files are excluded from Git.
+- Each `telegram.conf` uses the `telegram-send` INI format with a `[telegram]`
+  section. Keep these files private; secret configuration files are excluded
+  from Git.
 - The service environment has the `telegram-send` package installed:
 
   ```sh
@@ -60,6 +61,10 @@ backup services and timers, and enables the timers. Run it from the deployed che
 ```sh
 sudo ./install-systemd.sh
 ```
+
+For a full installation, missing per-script `positions` files are created
+empty before the timers start. Existing files are left untouched; add position
+IDs to these files or manage them through the dashboard.
 
 To install only the dashboard service (without monitoring or positions-import
 timers), use:
