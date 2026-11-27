@@ -504,8 +504,8 @@ configure_db_admin
 if ! run_db_admin --batch --skip-column-names -e \
     "SELECT COLLATION_NAME FROM INFORMATION_SCHEMA.COLLATIONS WHERE COLLATION_NAME='utf8mb4_uca1400_ai_ci'" |
     grep -q '^utf8mb4_uca1400_ai_ci$'; then
-    echo "Das Backup benötigt die MariaDB-Kollation utf8mb4_uca1400_ai_ci (MariaDB 10.10 oder neuer)." >&2
-    exit 1
+    echo "Die Kollation utf8mb4_uca1400_ai_ci wird nicht unterstützt; verwende utf8mb4_general_ci für den Restore."
+    sed -i 's/utf8mb4_uca1400_ai_ci/utf8mb4_general_ci/g' "$TMP_RESTORE_SQL"
 fi
 DB_EXISTS="$(run_db_admin --batch --skip-column-names -e \
     "SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME='${DB_NAME_VALUE}'")"

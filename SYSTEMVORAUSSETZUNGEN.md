@@ -15,8 +15,10 @@ ein. Monitoring- und Positionsimport-Timer können zusätzlich aktiviert werden.
   Systempakete, MariaDB und systemd.
 - **Python 3.10 oder neuer.** Das Script erstellt `.venv` und installiert die
   benötigten Python-Pakete selbst.
-- **MariaDB 10.10 oder neuer.** Das Backup benötigt die Kollation
-  `utf8mb4_uca1400_ai_ci`. Der Installer kann MariaDB installieren und starten.
+- **MariaDB.** Der Installer kann MariaDB installieren und starten. Falls die
+  Serverversion die im Backup verwendete Kollation
+  `utf8mb4_uca1400_ai_ci` nicht unterstützt, verwendet der Installer für den
+  Restore stattdessen `utf8mb4_general_ci`.
 - **Internetverbindung vom Server.** Benötigt für System- und Python-Pakete,
   Blockchain-RPC-Aufrufe, Kursdaten und Telegram-Nachrichten.
 - **Freier Speicherplatz** für das Projekt, die virtuelle Umgebung und den
