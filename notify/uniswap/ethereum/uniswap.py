@@ -116,7 +116,12 @@ CHAIN_CONFIG = {
         "v4_state_view": "0x7ffe42c4a5deea5b0fec41c94c136cf115597227",
         "v4_state_view_abi": "0x76Fd297e2D437cd7f76d50F01AfE6160f86e9990",
         "eth_usd_feed": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+        "eur_usd_feed": "0xb49f677943BC038e9857d61E7d053CaA2C1734C1",
         "weth": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "eur_stables": {
+            "EURe": "0x39b8B6385416f4cA36a20319F70D28621895279D",
+            "EURC": "0x1aBaEA1f7C830bD89Acc67eC4af516284b1bC33c",
+        },
         "usd_stables": {
             "USDC": "0xA0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
             "USDT": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
@@ -313,6 +318,13 @@ ERC20_ABI = [
 CHAINLINK_ABI = [
     {
         "inputs": [],
+        "name": "decimals",
+        "outputs": [{"type": "uint8"}],
+        "stateMutability": "view",
+        "type": "function",
+    },
+    {
+        "inputs": [],
         "name": "latestRoundData",
         "outputs": [
             {"type": "uint80"},
@@ -488,7 +500,7 @@ def is_usd_stable(token: str) -> bool:
     return token.lower() in {stable.lower() for stable in stablecoins}
 
 
-def get_token_usd_prices(
+async def get_token_usd_prices(
     token0: str,
     token1: str,
     token1_per_token0: Decimal,
@@ -500,6 +512,12 @@ def get_token_usd_prices(
     token1_is_weth = token1.lower() in {weth.lower(), ZERO_ADDRESS.lower()}
     token0_is_stable = is_usd_stable(token0)
     token1_is_stable = is_usd_stable(token1)
+    eur_stables = {
+        stable.lower()
+        for stable in CHAIN_CONFIG[CHAIN].get("eur_stables", {}).values()
+    }
+    token0_is_eur_stable = token0.lower() in eur_stables
+    token1_is_eur_stable = token1.lower() in eur_stables
 
     if token0_is_weth:
         return eth_usd, eth_usd / token1_per_token0, "pool_ratio_weth_chainlink_eth_usd"
@@ -512,6 +530,20 @@ def get_token_usd_prices(
 
     if token1_is_stable:
         return token1_per_token0, Decimal(1), "pool_ratio_usd_stable"
+
+    if token0_is_eur_stable or token1_is_eur_stable:
+        eur_usd = await get_eur_usd()
+        if token0_is_eur_stable:
+            return (
+                eur_usd,
+                eur_usd / token1_per_token0,
+                "pool_ratio_eur_stable_chainlink_eur_usd",
+            )
+        return (
+            token1_per_token0 * eur_usd,
+            eur_usd,
+            "pool_ratio_eur_stable_chainlink_eur_usd",
+        )
 
     return Decimal(0), Decimal(0), "unsupported_no_weth_or_usd_stable_anchor"
 
@@ -534,6 +566,33 @@ async def get_eth_usd() -> Decimal:
         ) from exc
 
     return Decimal(data[1]) / Decimal(10**8)
+
+
+async def get_eur_usd() -> Decimal:
+    feed_address = CHAIN_CONFIG[CHAIN]["eur_usd_feed"]
+    feed = w3.eth.contract(
+        address=normalize_address(feed_address),
+        abi=CHAINLINK_ABI,
+    )
+    code = await w3.eth.get_code(normalize_address(feed_address))
+    if not code:
+        raise RuntimeError(
+            f"Chainlink EUR/USD feed {feed_address} has no contract code on {CHAIN}. "
+            "Check the feed address and RPC network."
+        )
+
+    try:
+        decimals = await feed.functions.decimals().call()
+        data = await feed.functions.latestRoundData().call()
+    except Exception as exc:
+        raise RuntimeError(
+            f"Could not read Chainlink EUR/USD feed {feed_address} on {CHAIN}. "
+            "Check the feed address and RPC network."
+        ) from exc
+
+    if data[1] <= 0:
+        raise RuntimeError(f"Invalid Chainlink EUR/USD answer on {CHAIN}")
+    return Decimal(data[1]) / Decimal(10**decimals)
 
 
 async def get_symbol(token: str) -> str:
@@ -1082,7 +1141,7 @@ async def read_v3_position(token_id: int, eth_usd: Decimal) -> PositionSnapshot:
     fee0_adj = Decimal(unclaimed_fee0) / Decimal(10**decimals0)
     fee1_adj = Decimal(unclaimed_fee1) / Decimal(10**decimals1)
 
-    token0_usd, token1_usd, valuation_source = get_token_usd_prices(
+    token0_usd, token1_usd, valuation_source = await get_token_usd_prices(
         token0=token0,
         token1=token1,
         token1_per_token0=token1_per_token0,
@@ -1191,7 +1250,7 @@ async def read_v4_position(token_id: int, eth_usd: Decimal) -> PositionSnapshot:
     fee0_adj = Decimal(unclaimed_fee0) / Decimal(10**decimals0)
     fee1_adj = Decimal(unclaimed_fee1) / Decimal(10**decimals1)
 
-    token0_usd, token1_usd, valuation_source = get_token_usd_prices(
+    token0_usd, token1_usd, valuation_source = await get_token_usd_prices(
         token0=token0,
         token1=token1,
         token1_per_token0=token1_per_token0,
